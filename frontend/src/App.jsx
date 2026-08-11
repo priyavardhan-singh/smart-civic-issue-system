@@ -2,16 +2,12 @@ import './App.css'
 
 function App() {
   return (
-    <div className="home">
-      <h1>Smart Civic Issue Reporting System</h1>
-
-      <p>
-        Report civic problems in your area and help make your city better.
-      </p>
-
-      <button>Report an Issue</button>
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <h1 className="text-5xl font-bold text-blue-600">
+        Tailwind is Working!
+      </h1>
     </div>
   )
-} 
+}
 
 export default App
