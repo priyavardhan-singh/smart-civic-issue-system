@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
 function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -18,17 +19,18 @@ function Navbar() {
 
         {/* Desktop navigation links */}
         <div className="hidden md:flex gap-6">
-          <a href="#" className="text-gray-700 hover:text-blue-700">
+          <Link to="/" className="text-gray-700 hover:text-blue-700">
             Home
-          </a>
+          </Link>
 
-          <a href="#" className="text-gray-700 hover:text-blue-700">
+          <Link to="/report" className="text-gray-700 hover:text-blue-700">
             Report Issue
-          </a>
+          </Link>
 
-          <a href="#" className="text-gray-700 hover:text-blue-700">
+          <Link to="/my-reports" className="text-gray-700 hover:text-blue-700">
             My Reports
-          </a>
+          </Link>
+
         </div>
 
         {/* Login button */}
@@ -50,22 +52,31 @@ function Navbar() {
 
       {/* Mobile navigation menu */}
       {isMenuOpen && (
-        <div className="md:hidden flex flex-col gap-4 mt-4 pt-4 border-t">
+  <div className="md:hidden flex flex-col gap-4 mt-4 pt-4 border-t">
 
-          <a href="#" className="text-gray-700 hover:text-blue-700">
-            Home
-          </a>
+    <Link
+      to="/"
+      onClick={() => setIsMenuOpen(false)}
+      className="text-gray-700 hover:text-blue-700"
+    >
+      Home
+    </Link>
 
-          <a href="#" className="text-gray-700 hover:text-blue-700">
-            Report Issue
-          </a>
+    <Link
+      to="/report"
+      onClick={() => setIsMenuOpen(false)}
+      className="text-gray-700 hover:text-blue-700"
+    >
+      Report Issue
+    </Link>
 
-          <a href="#" className="text-gray-700 hover:text-blue-700">
-            My Reports
-          </a>
+    <Link to="/my-reports" onClick={() => setIsMenuOpen(false)}
+       className="text-gray-700 hover:text-blue-700" >
+       My Reports
+    </Link>
 
-        </div>
-      )}
+  </div>
+)}
 
     </nav>
   )
