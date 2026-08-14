@@ -1,5 +1,21 @@
-import { MapContainer, TileLayer, Marker } from "react-leaflet";
+import { useEffect } from "react";
+import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+
+function MapController({ location }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (location) {
+      map.setView(
+        [location.latitude, location.longitude],
+        15
+      );
+    }
+  }, [location, map]);
+
+  return null;
+}
 
 function LocationMap({ location ,onLocationChange }) {
   return (
@@ -12,6 +28,8 @@ function LocationMap({ location ,onLocationChange }) {
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+
+      <MapController location={location} />
 
       <Marker
   position={location
