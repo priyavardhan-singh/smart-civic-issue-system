@@ -4,12 +4,69 @@ import LocationMap from "../components/LocationMap";
 function ReportIssue() {
   const [selectedImage, setSelectedImage] = useState(null)
   const [location, setLocation] = useState(null)
-  const handleMarkerMove = (latitude, longitude) => {
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState([])
+  const [address, setAddress] = useState("")
+  const [locationConfirmed, setLocationConfirmed] = useState(false)
+
+  const handleSearchLocation = async () => {
+  if (!searchQuery.trim()) {
+    alert("Please enter a location to search.")
+    return
+  }
+
+  try {
+    const response = await fetch(
+  `https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&q=${encodeURIComponent(searchQuery)}`
+)
+
+    const data = await response.json()
+
+    if (data.length === 0) {
+      alert("Location not found. Please try another search.")
+      setSearchResults([])
+      return
+    }
+
+    setSearchResults(data)
+
+  } catch (error) {
+    console.error(error)
+    alert("Unable to search for the location.")
+  }
+}
+
+// Convert selected coordinates into a readable address
+  const fetchAddress = async (latitude, longitude) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+      );
+
+      const data = await response.json();
+
+      if (data.display_name) {
+        setAddress(data.display_name);
+      } else {
+        setAddress("Address not found");
+      }
+    } catch (error) {
+      console.error(error);
+      setAddress("Unable to find address");
+    }
+  };
+
+  // Update location and find its readable address
+const handleMarkerMove = (latitude, longitude) => {
+  setLocationConfirmed(false);
   setLocation({
     latitude,
     longitude,
   });
+
+  fetchAddress(latitude, longitude);
 };
+
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
 
@@ -176,11 +233,19 @@ function ReportIssue() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        })
-      },
+  const latitude = position.coords.latitude
+  const longitude = position.coords.longitude
+
+  setLocationConfirmed(false)
+
+  setLocation({
+    latitude,
+    longitude,
+  })
+
+  // Convert GPS coordinates into a readable address
+  fetchAddress(latitude, longitude)
+},
       (error) => {
         alert('Unable to get your location. Please allow location access.')
         console.log(error)
@@ -192,6 +257,65 @@ function ReportIssue() {
   📍 Use Current Location
 </button>
 
+{/* Location Search */}
+<div className="mt-4">
+  <label
+    htmlFor="location-search"
+    className="block text-sm font-medium text-gray-700"
+  >
+    Search Location
+  </label>
+
+  <div className="mt-2 flex gap-2">
+    <input
+      id="location-search"
+      type="text"
+      placeholder="Enter address or landmark"
+      value={searchQuery}
+      onChange={(event) => setSearchQuery(event.target.value)}
+      className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+    />
+
+    <button
+      type="button"
+      onClick={handleSearchLocation}
+      className="rounded-lg bg-gray-800 px-4 py-3 font-medium text-white hover:bg-gray-900"
+    >
+      Search
+    </button>
+  </div>
+
+  {searchResults.length > 0 && (
+    <div className="mt-3 rounded-lg border border-gray-200 bg-white">
+      {searchResults.map((result, index) => (
+        <button
+          key={index}
+          type="button"
+          onClick={() => {
+  const latitude = parseFloat(result.lat)
+  const longitude = parseFloat(result.lon)
+
+setLocationConfirmed(false)
+
+  setLocation({
+    latitude,
+    longitude,
+  })
+
+  // Get the readable address for the selected search result
+  fetchAddress(latitude, longitude)
+
+  setSearchResults([])
+}}
+          className="block w-full border-b border-gray-200 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 last:border-b-0"
+        >
+          📍 {result.display_name}
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+
 <LocationMap 
 location={location}
 onLocationChange={handleMarkerMove} />
@@ -199,8 +323,14 @@ onLocationChange={handleMarkerMove} />
 {location && (
   <div className="mt-4 rounded-lg bg-green-50 p-4">
     <p className="text-sm font-medium text-green-800">
-      Location detected successfully
+      Location selected successfully
     </p>
+
+    {address && (
+      <p className="mt-2 text-sm text-gray-700">
+        <span className="font-medium">Address:</span> {address}
+      </p>
+    )}
 
     <p className="mt-2 text-sm text-gray-700">
       Latitude: {location.latitude}
@@ -209,6 +339,23 @@ onLocationChange={handleMarkerMove} />
     <p className="text-sm text-gray-700">
       Longitude: {location.longitude}
     </p>
+
+    <button
+  type="button"
+  onClick={() => {
+    setLocationConfirmed(true)
+  }}
+  className="mt-4 w-full rounded-lg bg-green-700 px-4 py-3 font-medium text-white hover:bg-green-800"
+>
+  Confirm Location
+</button>
+
+{locationConfirmed && (
+  <p className="mt-3 text-center text-sm font-medium text-green-700">
+    ✓ Location confirmed
+  </p>
+)}
+
   </div>
 )}
 
