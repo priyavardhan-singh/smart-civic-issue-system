@@ -3,6 +3,11 @@ import LocationMap from "../components/LocationMap";
 
 function ReportIssue() {
   const [selectedImage, setSelectedImage] = useState(null)
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [category, setCategory] = useState("")
+  const [description, setDescription] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitSuccess, setSubmitSuccess] = useState(false)
   const [location, setLocation] = useState(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState([])
@@ -67,10 +72,59 @@ const handleMarkerMove = (latitude, longitude) => {
   fetchAddress(latitude, longitude);
 };
 
+const handleSubmit = (event) => {
+  event.preventDefault();
+
+  setIsSubmitting(true)
+  setSubmitSuccess(false)
+
+  if (!category) {
+  setIsSubmitting(false);
+  alert("Please select an issue category.");
+  return;
+}
+
+  if (!description.trim()) {
+  setIsSubmitting(false);
+  alert("Please describe the issue.");
+  return;
+}
+
+  if (!location) {
+  setIsSubmitting(false);
+  alert("Please select the issue location.");
+  return;
+}
+
+  if (!locationConfirmed) {
+  setIsSubmitting(false);
+  alert("Please confirm the issue location.");
+  return;
+}
+
+ const reportData = {
+  category,
+  description,
+  photo: selectedFile,
+  location,
+  address,
+};
+
+console.log("Report data:", reportData);
+
+setTimeout(() => {
+  console.log("Report submitted successfully:", reportData);
+  setIsSubmitting(false);
+  setSubmitSuccess(true);
+}, 1500);
+
+};
+
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
 
       <div className="mx-auto max-w-xl">
+        <form onSubmit={handleSubmit}>
 
         <h1 className="text-3xl font-bold text-gray-900">
           Report an Issue
@@ -91,6 +145,8 @@ const handleMarkerMove = (latitude, longitude) => {
   <select
     id="category"
     name="category"
+    value={category}
+    onChange={(event) => setCategory(event.target.value)}
     className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
   >
     <option value="">Select an issue</option>
@@ -115,6 +171,8 @@ const handleMarkerMove = (latitude, longitude) => {
     id="description"
     name="description"
     rows="5"
+    value={description}
+    onChange={(event) => setDescription(event.target.value)}
     placeholder="Describe the problem in detail..."
     className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-700 placeholder-gray-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
   ></textarea>
@@ -150,6 +208,7 @@ const handleMarkerMove = (latitude, longitude) => {
         const file = event.target.files[0]
 
         if (file) {
+          setSelectedFile(file)
           setSelectedImage(URL.createObjectURL(file))
         }
       }}
@@ -176,6 +235,7 @@ const handleMarkerMove = (latitude, longitude) => {
         const file = event.target.files[0]
 
         if (file) {
+          setSelectedFile(file)
           setSelectedImage(URL.createObjectURL(file))
         }
       }}
@@ -204,7 +264,10 @@ const handleMarkerMove = (latitude, longitude) => {
 
       <button
         type="button"
-        onClick={() => setSelectedImage(null)}
+        onClick={() => {
+  setSelectedImage(null)
+  setSelectedFile(null)
+}}
         className="mt-3 w-full rounded-lg border border-red-300 px-4 py-3 text-red-600 hover:bg-red-50"
       >
         Remove Photo
@@ -362,8 +425,23 @@ onLocationChange={handleMarkerMove} />
   <p className="mt-2 text-sm text-gray-500">
     Use your current location to help authorities identify the issue.
   </p>
-</div>
 
+<button
+  type="submit"
+  disabled={isSubmitting}
+  className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-3 font-medium text-white hover:bg-blue-800"
+>
+  {isSubmitting ? "Submitting..." : "Submit Report"}
+</button>
+
+{submitSuccess && (
+  <p className="mt-3 text-center text-sm font-medium text-green-700">
+    ✓ Report submitted successfully
+  </p>
+)}
+
+</div>
+        </form>
       </div>
 
     </main>
