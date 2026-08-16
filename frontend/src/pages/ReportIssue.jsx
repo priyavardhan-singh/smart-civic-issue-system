@@ -121,8 +121,21 @@ console.log("Report data:", reportData);
 
 setTimeout(() => {
   console.log("Report submitted successfully:", reportData);
+
   setIsSubmitting(false);
   setSubmitSuccess(true);
+
+  // Reset form after successful submission
+  setCategory("");
+  setDescription("");
+  setSelectedImage(null);
+  setSelectedFile(null);
+  setLocation(null);
+  setSearchQuery("");
+  setSearchResults([]);
+  setAddress("");
+  setLocationConfirmed(false);
+  setErrorMessage("");
 }, 1500);
 
 };
