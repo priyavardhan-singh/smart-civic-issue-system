@@ -13,10 +13,12 @@ function ReportIssue() {
   const [searchResults, setSearchResults] = useState([])
   const [address, setAddress] = useState("")
   const [locationConfirmed, setLocationConfirmed] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
 
   const handleSearchLocation = async () => {
+    setErrorMessage("")
   if (!searchQuery.trim()) {
-    alert("Please enter a location to search.")
+    setErrorMessage("Please enter a location to search.")
     return
   }
 
@@ -28,7 +30,7 @@ function ReportIssue() {
     const data = await response.json()
 
     if (data.length === 0) {
-      alert("Location not found. Please try another search.")
+      setErrorMessage("Location not found. Please try another search.")
       setSearchResults([])
       return
     }
@@ -36,8 +38,8 @@ function ReportIssue() {
     setSearchResults(data)
 
   } catch (error) {
-    console.error(error)
-    alert("Unable to search for the location.")
+    console.error(error)  
+  setErrorMessage("Unable to search for the location.")
   }
 }
 
@@ -54,16 +56,20 @@ function ReportIssue() {
         setAddress(data.display_name);
       } else {
         setAddress("Address not found");
+        setErrorMessage("Unable to find a readable address for this location.");
       }
     } catch (error) {
       console.error(error);
       setAddress("Unable to find address");
+      setErrorMessage("Unable to find a readable address for this location.");
     }
   };
 
   // Update location and find its readable address
 const handleMarkerMove = (latitude, longitude) => {
   setLocationConfirmed(false);
+  setErrorMessage("");
+  
   setLocation({
     latitude,
     longitude,
@@ -77,28 +83,29 @@ const handleSubmit = (event) => {
 
   setIsSubmitting(true)
   setSubmitSuccess(false)
+  setErrorMessage("")
 
   if (!category) {
   setIsSubmitting(false);
-  alert("Please select an issue category.");
+  setErrorMessage("Please select an issue category.");
   return;
 }
 
   if (!description.trim()) {
   setIsSubmitting(false);
-  alert("Please describe the issue.");
+  setErrorMessage("Please describe the issue.");
   return;
 }
 
   if (!location) {
   setIsSubmitting(false);
-  alert("Please select the issue location.");
+  setErrorMessage("Please select the issue location.");
   return;
 }
 
   if (!locationConfirmed) {
   setIsSubmitting(false);
-  alert("Please confirm the issue location.");
+  setErrorMessage("Please confirm the issue location.");
   return;
 }
 
@@ -289,8 +296,9 @@ setTimeout(() => {
 <button
   type="button"
   onClick={() => {
+    setErrorMessage("")
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by this browser.')
+        setErrorMessage("Geolocation is not supported by this browser.")
       return
     }
 
@@ -300,6 +308,7 @@ setTimeout(() => {
   const longitude = position.coords.longitude
 
   setLocationConfirmed(false)
+  setErrorMessage("")
 
   setLocation({
     latitude,
@@ -310,7 +319,7 @@ setTimeout(() => {
   fetchAddress(latitude, longitude)
 },
       (error) => {
-        alert('Unable to get your location. Please allow location access.')
+        setErrorMessage("Unable to get your location. Please allow location access.")
         console.log(error)
       }
     )
@@ -359,6 +368,7 @@ setTimeout(() => {
   const longitude = parseFloat(result.lon)
 
 setLocationConfirmed(false)
+setErrorMessage("")
 
   setLocation({
     latitude,
@@ -425,6 +435,12 @@ onLocationChange={handleMarkerMove} />
   <p className="mt-2 text-sm text-gray-500">
     Use your current location to help authorities identify the issue.
   </p>
+
+  {errorMessage && (
+  <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">
+    {errorMessage}
+  </p>
+)}
 
 <button
   type="submit"
