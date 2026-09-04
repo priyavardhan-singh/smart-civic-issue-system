@@ -7,3 +7,7 @@ class ReportCreate(BaseModel):
     latitude: float
     longitude: float
     address: str
+
+
+class ReportStatusUpdate(BaseModel):
+    status: str

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from database import db
-from models import ReportCreate
+from models import ReportCreate, ReportStatusUpdate
 from bson import ObjectId
 
 app = FastAPI()
@@ -85,3 +85,48 @@ def get_report(report_id: str):
     report["_id"] = str(report["_id"])
 
     return report
+
+@app.patch("/reports/{report_id}/status")
+def update_report_status(
+    report_id: str,
+    status_update: ReportStatusUpdate
+):
+    if not ObjectId.is_valid(report_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid report ID"
+        )
+
+    allowed_statuses = [
+        "reported",
+        "assigned",
+        "in_progress",
+        "resolved"
+    ]
+
+    if status_update.status not in allowed_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid report status"
+        )
+
+    result = db.reports.update_one(
+        {"_id": ObjectId(report_id)},
+        {
+            "$set": {
+                "status": status_update.status,
+                "updated_at": datetime.now(timezone.utc)
+            }
+        }
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Report not found"
+        )
+
+    return {
+        "message": "Report status updated successfully",
+        "status": status_update.status
+    }
