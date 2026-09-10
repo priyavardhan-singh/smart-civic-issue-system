@@ -78,67 +78,111 @@ const handleMarkerMove = (latitude, longitude) => {
   fetchAddress(latitude, longitude);
 };
 
-const handleSubmit = (event) => {
-  event.preventDefault();
+const handleSubmit = async (event) => {
+  event.preventDefault()
 
   setIsSubmitting(true)
   setSubmitSuccess(false)
   setErrorMessage("")
 
   if (!category) {
-  setIsSubmitting(false);
-  setErrorMessage("Please select an issue category.");
-  return;
-}
+    setIsSubmitting(false)
+    setErrorMessage("Please select an issue category.")
+    return
+  }
 
   if (!description.trim()) {
-  setIsSubmitting(false);
-  setErrorMessage("Please describe the issue.");
-  return;
-}
+    setIsSubmitting(false)
+    setErrorMessage("Please describe the issue.")
+    return
+  }
+
+  if (!selectedFile) {
+    setIsSubmitting(false)
+    setErrorMessage("Please add a photo of the issue.")
+    return
+  }
 
   if (!location) {
-  setIsSubmitting(false);
-  setErrorMessage("Please select the issue location.");
-  return;
-}
+    setIsSubmitting(false)
+    setErrorMessage("Please select the issue location.")
+    return
+  }
 
   if (!locationConfirmed) {
-  setIsSubmitting(false);
-  setErrorMessage("Please confirm the issue location.");
-  return;
+    setIsSubmitting(false)
+    setErrorMessage("Please confirm the issue location.")
+    return
+  }
+
+  try {
+    const formData = new FormData()
+
+    formData.append("category", category)
+    formData.append("description", description.trim())
+    formData.append("latitude", String(location.latitude))
+    formData.append("longitude", String(location.longitude))
+    formData.append("address", address)
+    formData.append("photo", selectedFile)
+
+    const token = localStorage.getItem("access_token")
+
+if (!token) {
+  throw new Error("Please login before submitting a report.")
 }
 
- const reportData = {
-  category,
-  description,
-  photo: selectedFile,
-  location,
-  address,
-};
+const response = await fetch(
+  "http://127.0.0.1:8000/reports",
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  }
+)
 
-console.log("Report data:", reportData);
+    const data = await response.json()
 
-setTimeout(() => {
-  console.log("Report submitted successfully:", reportData);
+    if (!response.ok) {
+      throw new Error(
+        data.detail || "Failed to submit report."
+      )
+    }
 
-  setIsSubmitting(false);
-  setSubmitSuccess(true);
+    console.log(
+      "Report submitted successfully:",
+      data
+    )
 
-  // Reset form after successful submission
-  setCategory("");
-  setDescription("");
-  setSelectedImage(null);
-  setSelectedFile(null);
-  setLocation(null);
-  setSearchQuery("");
-  setSearchResults([]);
-  setAddress("");
-  setLocationConfirmed(false);
-  setErrorMessage("");
-}, 1500);
+    setSubmitSuccess(true)
 
-};
+    // Reset form only after successful backend submission
+    setCategory("")
+    setDescription("")
+    setSelectedImage(null)
+    setSelectedFile(null)
+    setLocation(null)
+    setSearchQuery("")
+    setSearchResults([])
+    setAddress("")
+    setLocationConfirmed(false)
+    setErrorMessage("")
+  } catch (error) {
+    console.error(
+      "Report submission error:",
+      error
+    )
+
+    setErrorMessage(
+      error instanceof Error
+        ? error.message
+        : "Unable to submit report. Please try again."
+    )
+  } finally {
+    setIsSubmitting(false)
+  }
+}
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">

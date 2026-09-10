@@ -1,3 +1,5 @@
+import Login from './pages/Login'
+import Register from './pages/Register'
 import ReportIssue from './pages/ReportIssue'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
@@ -13,6 +15,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/report" element={<ReportIssue />} />
         <Route path="/my-reports" element={<MyReports />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
       </Routes>
 
     </BrowserRouter>

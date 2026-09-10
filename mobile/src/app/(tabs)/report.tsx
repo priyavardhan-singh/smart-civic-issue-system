@@ -1,4 +1,6 @@
-import { useRef, useState } from 'react';
+import { File } from 'expo-file-system';
+import { useEffect, useRef, useState } from 'react';
+import { router } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +17,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import * as SecureStore from 'expo-secure-store';
 import MapView, { Marker } from 'react-native-maps';
 
 type LocationData = {
@@ -36,6 +39,9 @@ const CATEGORIES = [
   { value: 'sewage', label: 'Sewage Problem' },
   { value: 'other', label: 'Other' },
 ];
+
+const REPORT_DRAFT_KEY = 'report_draft';
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export default function ReportIssue() {
   const [category, setCategory] = useState('');
@@ -61,6 +67,83 @@ export default function ReportIssue() {
 
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
+  useEffect(() => {
+    const restoreReportDraft = async () => {
+    try {
+      const savedDraft =
+        await SecureStore.getItemAsync(
+          REPORT_DRAFT_KEY
+        );
+
+      if (!savedDraft) {
+        return;
+      }
+
+      const draft = JSON.parse(savedDraft);
+
+      setCategory(draft.category || '');
+      setDescription(draft.description || '');
+
+      setAddress(draft.address || '');
+
+      setLocation(
+        draft.location || null
+      );
+
+      setLocationConfirmed(
+        draft.locationConfirmed || false
+      );
+
+      setSearchQuery(
+        draft.searchQuery || ''
+      );
+
+      if (draft.photoUri) {
+        setSelectedImage(
+          draft.photoUri
+        );
+
+        setSelectedFile({
+          uri: draft.photoUri,
+        });
+      }
+    } catch (error) {
+      console.log(
+        'Draft restore error:',
+        error
+      );
+    }
+  };
+
+    restoreReportDraft();
+  }, []);
+
+  const saveReportDraft = async () => {
+  try {
+    const draft = {
+      category,
+      description,
+      location,
+      address,
+      locationConfirmed,
+      searchQuery,
+      photoUri:
+        selectedFile?.uri ||
+        selectedImage ||
+        null,
+    };
+
+    await SecureStore.setItemAsync(
+      REPORT_DRAFT_KEY,
+      JSON.stringify(draft)
+    );
+  } catch (error) {
+    console.log(
+      'Draft save error:',
+      error
+    );
+  }
+};
  
 
   // ------------------------------------------------------------
@@ -339,77 +422,177 @@ export default function ReportIssue() {
 
   // ------------------------------------------------------------
   // SUBMIT
-  // Frontend simulation for now
+  // Submit report to FastAPI backend
   // ------------------------------------------------------------
 
   const handleSubmit = async () => {
-    setErrorMessage('');
-    setSubmitSuccess(false);
+  setErrorMessage('');
+  setSubmitSuccess(false);
 
-    if (!category) {
-      setErrorMessage(
-        'Please select an issue category.'
+  if (!category) {
+    setErrorMessage(
+      'Please select an issue category.'
+    );
+    return;
+  }
+
+  if (!description.trim()) {
+    setErrorMessage(
+      'Please describe the issue.'
+    );
+    return;
+  }
+
+  if (!selectedFile) {
+    setErrorMessage(
+      'Please add a photo of the issue.'
+    );
+    return;
+  }
+
+  if (!location) {
+    setErrorMessage(
+      'Please select the issue location.'
+    );
+    return;
+  }
+
+  if (!locationConfirmed) {
+    setErrorMessage(
+      'Please confirm the issue location.'
+    );
+    return;
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    const token =
+      await SecureStore.getItemAsync(
+        'access_token'
       );
+
+    if (!token) {
+      Alert.alert(
+        'Login Required',
+        'Please login or create an account before submitting your report.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Login',
+            onPress: async () => {
+              await saveReportDraft();
+              router.push('/login?from=report');
+            },
+          },
+          {
+            text: 'Register',
+            onPress: async () => {
+              await saveReportDraft();
+              router.push('/register?from=report');
+            },
+          },
+        ]
+      );
+
       return;
     }
 
-    if (!description.trim()) {
-      setErrorMessage(
-        'Please describe the issue.'
+    const formData = new FormData();
+
+    formData.append(
+      'category',
+      category
+    );
+
+    formData.append(
+      'description',
+      description.trim()
+    );
+
+    formData.append(
+      'latitude',
+      String(location.latitude)
+    );
+
+    formData.append(
+      'longitude',
+      String(location.longitude)
+    );
+
+    formData.append(
+      'address',
+      address
+    );
+
+    const photoFile =
+      new File(selectedFile.uri);
+
+    formData.append(
+      'photo',
+      photoFile
+    );
+
+    const response = await fetch(
+      `${API_URL}/reports`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail ||
+          'Failed to submit report.'
       );
-      return;
     }
 
-    if (!location) {
-      setErrorMessage(
-        'Please select the issue location.'
-      );
-      return;
-    }
+    console.log(
+      'Report submitted successfully:',
+      data
+    );
 
-    if (!locationConfirmed) {
-      setErrorMessage(
-        'Please confirm the issue location.'
-      );
-      return;
-    }
+    await SecureStore.deleteItemAsync(
+      REPORT_DRAFT_KEY
+    );
 
-    setIsSubmitting(true);
+    setSubmitSuccess(true);
 
-    const reportData = {
-      category,
-      description: description.trim(),
-      photo: selectedFile,
-      location,
-      address,
-    };
+    // Reset form only after successful submission
+    setCategory('');
+    setDescription('');
+    setSelectedImage(null);
+    setSelectedFile(null);
 
-    console.log('Report data:', reportData);
+    setLocation(null);
+    setAddress('');
+    setLocationConfirmed(false);
 
-    // Temporary frontend simulation.
-    // Later this will become a FastAPI POST request.
-    setTimeout(() => {
-      console.log(
-        'Report submitted successfully:',
-        reportData
-      );
+    setSearchQuery('');
+  } catch (error) {
+    console.log(
+      'Report submission error:',
+      error
+    );
 
-      setIsSubmitting(false);
-      setSubmitSuccess(true);
-
-      // Reset form
-      setCategory('');
-      setDescription('');
-      setSelectedImage(null);
-      setSelectedFile(null);
-
-      setLocation(null);
-      setAddress('');
-      setLocationConfirmed(false);
-
-      setSearchQuery('');
-    }, 1500);
-  };
+    setErrorMessage(
+      error instanceof Error
+        ? error.message
+        : 'Unable to submit report. Please try again.'
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // ------------------------------------------------------------
   // SELECTED CATEGORY LABEL

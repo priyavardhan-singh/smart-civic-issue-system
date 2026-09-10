@@ -1,13 +1,35 @@
 from datetime import datetime, timezone
+from pathlib import Path
+from uuid import uuid4
+import shutil
 
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, Form, UploadFile, Depends, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from database import db
-from models import ReportCreate, ReportStatusUpdate
+from models import ReportStatusUpdate, UserRegister, UserLogin
+from auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    JWT_SECRET_KEY,
+    ALGORITHM,
+)
+from jose import JWTError, jwt
 from bson import ObjectId
 
 app = FastAPI()
+
+UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
+
+UPLOAD_DIR.mkdir(exist_ok=True)
+
+app.mount(
+    "/uploads",
+    StaticFiles(directory=UPLOAD_DIR),
+    name="uploads",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,6 +39,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+security = HTTPBearer()
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    token = credentials.credentials
+
+    try:
+        payload = jwt.decode(
+            token,
+            JWT_SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        user_id = payload.get("sub")
+
+        if not user_id or not ObjectId.is_valid(user_id):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authentication token"
+            )
+
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired authentication token"
+        )
+
+    user = db.users.find_one({
+        "_id": ObjectId(user_id)
+    })
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found"
+        )
+
+    return user
 
 @app.get("/")
 def root():
@@ -36,22 +98,100 @@ def database_health():
         "database": "connected"
     }
 
-@app.post("/reports")
-def create_report(report: ReportCreate):
+@app.post("/register")
+def register_user(user: UserRegister):
+    existing_user = db.users.find_one({
+        "email": user.email.lower()
+    })
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
     now = datetime.now(timezone.utc)
 
-    report_data = report.model_dump()
+    user_data = {
+        "name": user.name.strip(),
+        "email": user.email.lower().strip(),
+        "password_hash": hash_password(user.password),
+        "role": "citizen",
+        "created_at": now,
+    }
 
-    report_data["status"] = "reported"
-    report_data["created_at"] = now
-    report_data["updated_at"] = now
+    result = db.users.insert_one(user_data)
+
+    return {
+        "message": "User registered successfully",
+        "user_id": str(result.inserted_id),
+        "role": "citizen"
+    }
+
+@app.post("/reports")
+def create_report(
+    category: str = Form(...),
+    description: str = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    address: str = Form(...),
+    photo: UploadFile = File(...),
+    current_user = Security(get_current_user)
+):
+    # Make sure only image files are accepted
+    if not photo.content_type or not photo.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file must be an image"
+        )
+
+    # Preserve the original file extension
+    file_extension = Path(photo.filename or "").suffix.lower()
+
+    allowed_extensions = {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp"
+    }
+
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported image format"
+        )
+
+    # Give every uploaded image a unique name
+    unique_filename = f"{uuid4()}{file_extension}"
+
+    file_path = UPLOAD_DIR / unique_filename
+
+    # Save image inside backend/uploads/
+    with file_path.open("wb") as buffer:
+        shutil.copyfileobj(photo.file, buffer)
+
+    now = datetime.now(timezone.utc)
+
+    report_data = {
+        "user_id": str(current_user["_id"]),
+        "category": category,
+        "description": description,
+        "latitude": latitude,
+        "longitude": longitude,
+        "address": address,
+        "photo_url": f"/uploads/{unique_filename}",
+        "status": "reported",
+        "created_at": now,
+        "updated_at": now,
+    }
 
     result = db.reports.insert_one(report_data)
 
     return {
         "message": "Report created successfully",
         "report_id": str(result.inserted_id),
-        "status": "reported"
+        "status": "reported",
+        "photo_url": f"/uploads/{unique_filename}"
     }
 
 @app.get("/reports")
@@ -59,6 +199,20 @@ def get_reports():
     reports = []
 
     for report in db.reports.find():
+        report["_id"] = str(report["_id"])
+        reports.append(report)
+
+    return reports
+
+@app.get("/my-reports")
+def get_my_reports(
+    current_user = Security(get_current_user)
+):
+    reports = []
+
+    for report in db.reports.find({
+        "user_id": str(current_user["_id"])
+    }).sort("created_at", -1):
         report["_id"] = str(report["_id"])
         reports.append(report)
 
@@ -129,4 +283,53 @@ def update_report_status(
     return {
         "message": "Report status updated successfully",
         "status": status_update.status
+    }
+
+@app.post("/login")
+def login_user(user: UserLogin):
+    existing_user = db.users.find_one({
+        "email": user.email.lower().strip()
+    })
+
+    if not existing_user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    if not verify_password(
+        user.password,
+        existing_user["password_hash"]
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    access_token = create_access_token({
+        "sub": str(existing_user["_id"]),
+        "role": existing_user["role"]
+    })
+
+    return {
+        "message": "Login successful",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(existing_user["_id"]),
+            "name": existing_user["name"],
+            "email": existing_user["email"],
+            "role": existing_user["role"]
+        }
+    }
+
+@app.get("/me")
+def get_me(
+    current_user = Depends(get_current_user)
+):
+    return {
+        "id": str(current_user["_id"]),
+        "name": current_user["name"],
+        "email": current_user["email"],
+        "role": current_user["role"]
     }

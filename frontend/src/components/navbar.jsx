@@ -1,8 +1,31 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [user, setUser] = useState(null)
+
+  const location = useLocation()
+  const navigate = useNavigate()
+    useEffect(() => {
+    const storedUser = localStorage.getItem("user")
+
+    if (storedUser) {
+      setUser(JSON.parse(storedUser))
+    } else {
+      setUser(null)
+    }
+  }, [location])
+
+    const handleLogout = () => {
+    localStorage.removeItem("access_token")
+    localStorage.removeItem("user")
+
+    setUser(null)
+    setIsMenuOpen(false)
+
+    navigate("/login")
+  }
 
   return (
     <nav className="bg-white border-b px-6 py-4">
@@ -33,12 +56,39 @@ function Navbar() {
 
         </div>
 
-        {/* Login button */}
-        <div className="hidden md:block">
-          <button className="bg-blue-700 text-white px-5 py-2 rounded-lg hover:bg-blue-800 transition">
-            Login
-          </button>
-        </div>
+         {/* Authentication */}
+<div className="hidden md:flex items-center gap-3">
+  {user ? (
+    <>
+      <span className="text-sm font-medium text-gray-700">
+        {user.name}
+      </span>
+
+      <button
+        onClick={handleLogout}
+        className="bg-red-600 text-white px-5 py-2 rounded-lg hover:bg-red-700 transition"
+      >
+        Logout
+      </button>
+    </>
+  ) : (
+    <>
+      <Link
+        to="/login"
+        className="bg-blue-700 text-white px-5 py-2 rounded-lg hover:bg-blue-800 transition"
+      >
+        Login
+      </Link>
+
+      <Link
+        to="/register"
+        className="border border-blue-700 text-blue-700 px-5 py-2 rounded-lg hover:bg-blue-50 transition"
+      >
+        Register
+      </Link>
+    </>
+  )}
+</div>
 
         {/* Mobile menu button */}
         <button
@@ -74,6 +124,40 @@ function Navbar() {
        className="text-gray-700 hover:text-blue-700" >
        My Reports
     </Link>
+
+   {user ? (
+  <>
+    <span className="font-medium text-gray-700">
+      {user.name}
+    </span>
+
+    <button
+      type="button"
+      onClick={handleLogout}
+      className="text-left font-medium text-red-600 hover:text-red-700"
+    >
+      Logout
+    </button>
+  </>
+) : (
+  <>
+    <Link
+      to="/login"
+      onClick={() => setIsMenuOpen(false)}
+      className="text-gray-700 hover:text-blue-700"
+    >
+      Login
+    </Link>
+
+    <Link
+      to="/register"
+      onClick={() => setIsMenuOpen(false)}
+      className="text-gray-700 hover:text-blue-700"
+    >
+      Register
+    </Link>
+  </>
+)}
 
   </div>
 )}
