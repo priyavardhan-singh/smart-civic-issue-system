@@ -8,7 +8,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from database import db
-from models import ReportStatusUpdate, UserRegister, UserLogin
+from models import (
+    ReportStatusUpdate,
+    UserRegister,
+    UserLogin,
+    UserProfileUpdate,
+    ReportAssignment,
+)
 from auth import (
     hash_password,
     verify_password,
@@ -79,6 +85,17 @@ def get_current_user(
         )
 
     return user
+
+def get_current_admin(
+    current_user = Security(get_current_user)
+):
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+
+    return current_user
 
 @app.get("/")
 def root():
@@ -195,7 +212,9 @@ def create_report(
     }
 
 @app.get("/reports")
-def get_reports():
+def get_reports(
+    current_admin = Security(get_current_admin)
+):
     reports = []
 
     for report in db.reports.find():
@@ -219,7 +238,10 @@ def get_my_reports(
     return reports
 
 @app.get("/reports/{report_id}")
-def get_report(report_id: str):
+def get_report(
+    report_id: str,
+    current_admin = Security(get_current_admin)
+):
     if not ObjectId.is_valid(report_id):
         raise HTTPException(
             status_code=400,
@@ -243,7 +265,8 @@ def get_report(report_id: str):
 @app.patch("/reports/{report_id}/status")
 def update_report_status(
     report_id: str,
-    status_update: ReportStatusUpdate
+    status_update: ReportStatusUpdate,
+    current_admin = Security(get_current_admin)
 ):
     if not ObjectId.is_valid(report_id):
         raise HTTPException(
@@ -283,6 +306,71 @@ def update_report_status(
     return {
         "message": "Report status updated successfully",
         "status": status_update.status
+    }
+
+@app.patch("/reports/{report_id}/assign")
+def assign_report(
+    report_id: str,
+    assignment: ReportAssignment,
+    current_admin = Security(get_current_admin)
+):
+    if not ObjectId.is_valid(report_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid report ID"
+        )
+
+    department = assignment.department.strip()
+    assigned_to = assignment.assigned_to.strip()
+
+    if not department:
+        raise HTTPException(
+            status_code=400,
+            detail="Department cannot be empty"
+        )
+
+    if not assigned_to:
+        raise HTTPException(
+            status_code=400,
+            detail="Assigned officer cannot be empty"
+        )
+
+    result = db.reports.update_one(
+        {
+            "_id": ObjectId(report_id)
+        },
+        {
+            "$set": {
+                "department": department,
+                "assigned_to": assigned_to,
+                "assigned_at": datetime.now(
+                    timezone.utc
+                ),
+                "status": "assigned",
+                "updated_at": datetime.now(
+                    timezone.utc
+                ),
+            }
+        }
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Report not found"
+        )
+
+    updated_report = db.reports.find_one({
+        "_id": ObjectId(report_id)
+    })
+
+    updated_report["_id"] = str(
+        updated_report["_id"]
+    )
+
+    return {
+        "message": "Report assigned successfully",
+        "report": updated_report
     }
 
 @app.post("/login")
@@ -325,7 +413,7 @@ def login_user(user: UserLogin):
 
 @app.get("/me")
 def get_me(
-    current_user = Depends(get_current_user)
+   current_user = Security(get_current_user)
 ):
     return {
         "id": str(current_user["_id"]),
@@ -333,3 +421,66 @@ def get_me(
         "email": current_user["email"],
         "role": current_user["role"]
     }
+
+@app.patch("/me")
+def update_me(
+    profile_update: UserProfileUpdate,
+    current_user = Security(get_current_user)
+):
+    name = profile_update.name.strip()
+    email = profile_update.email.lower().strip()
+
+    if not name:
+        raise HTTPException(
+            status_code=400,
+            detail="Name cannot be empty"
+        )
+
+    if not email:
+        raise HTTPException(
+            status_code=400,
+            detail="Email cannot be empty"
+        )
+
+    existing_email_user = db.users.find_one({
+        "email": email,
+        "_id": {
+            "$ne": current_user["_id"]
+        }
+    })
+
+    if existing_email_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
+    db.users.update_one(
+        {
+            "_id": current_user["_id"]
+        },
+        {
+            "$set": {
+                "name": name,
+                "email": email,
+                "updated_at": datetime.now(
+                    timezone.utc
+                )
+            }
+        }
+    )
+
+    updated_user = db.users.find_one({
+        "_id": current_user["_id"]
+    })
+
+    return {
+        "message": "Profile updated successfully",
+        "user": {
+            "id": str(updated_user["_id"]),
+            "name": updated_user["name"],
+            "email": updated_user["email"],
+            "role": updated_user["role"]
+        }
+    }
+

@@ -21,3 +21,11 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+
+class UserProfileUpdate(BaseModel):
+    name: str
+    email: str
+
+class ReportAssignment(BaseModel):
+    department: str
+    assigned_to: str

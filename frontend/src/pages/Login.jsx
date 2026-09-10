@@ -48,7 +48,11 @@ function Login() {
         JSON.stringify(data.user)
       )
 
-      navigate("/my-reports")
+      if (data.user.role === "admin") {
+  navigate("/admin")
+} else {
+  navigate("/my-reports")
+}
     } catch (error) {
       setErrorMessage(
         error instanceof Error
