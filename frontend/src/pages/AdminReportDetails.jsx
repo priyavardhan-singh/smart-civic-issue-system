@@ -22,18 +22,30 @@ function AdminReportDetails() {
   const [isUpdating, setIsUpdating] =
     useState(false)
 
-const [department, setDepartment] =
-  useState("")
+const [departments, setDepartments] =
+  useState([])
 
-const [assignedTo, setAssignedTo] =
-  useState("")
+const [officers, setOfficers] =
+  useState([])
+
+const [
+  selectedDepartmentId,
+  setSelectedDepartmentId,
+] = useState("")
+
+const [
+  selectedOfficerId,
+  setSelectedOfficerId,
+] = useState("")
+
+const [isLoadingOfficers, setIsLoadingOfficers] =
+  useState(false)
 
 const [isAssigning, setIsAssigning] =
   useState(false)
 
 const [successMessage, setSuccessMessage] =
   useState("")
-
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -92,13 +104,6 @@ const [successMessage, setSuccessMessage] =
 
         setReport(data)
 
-setDepartment(
-  data.department || ""
-)
-
-setAssignedTo(
-  data.assigned_to || ""
-)
       } catch (error) {
         setErrorMessage(
           error instanceof Error
@@ -112,6 +117,101 @@ setAssignedTo(
 
     loadReport()
   }, [reportId, navigate])
+
+useEffect(() => {
+  const loadDepartments = async () => {
+    try {
+      const token =
+        localStorage.getItem(
+          "access_token"
+        )
+
+      const response = await fetch(
+        `${API_URL}/departments`,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+          },
+        }
+      )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            "Unable to load departments."
+        )
+      }
+
+      setDepartments(data)
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to load departments."
+      )
+    }
+  }
+
+  loadDepartments()
+}, [])
+
+useEffect(() => {
+  const loadOfficers = async () => {
+    if (!selectedDepartmentId) {
+      setOfficers([])
+      setSelectedOfficerId("")
+      return
+    }
+
+    setIsLoadingOfficers(true)
+    setSelectedOfficerId("")
+
+    try {
+      const token =
+        localStorage.getItem(
+          "access_token"
+        )
+
+      const response = await fetch(
+        `${API_URL}/departments/${selectedDepartmentId}/officers`,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+          },
+        }
+      )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            "Unable to load officers."
+        )
+      }
+
+      setOfficers(data)
+    } catch (error) {
+      setOfficers([])
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to load officers."
+      )
+    } finally {
+      setIsLoadingOfficers(false)
+    }
+  }
+
+  loadOfficers()
+}, [selectedDepartmentId])
 
   const updateStatus = async (
     newStatus
@@ -177,16 +277,40 @@ const assignReport = async () => {
   setErrorMessage("")
   setSuccessMessage("")
 
-  if (!department.trim()) {
+  if (!selectedDepartmentId) {
     setErrorMessage(
-      "Please select or enter a department."
+      "Please select a department."
     )
     return
   }
 
-  if (!assignedTo.trim()) {
+  if (!selectedOfficerId) {
     setErrorMessage(
-      "Please enter the officer name."
+      "Please select an officer."
+    )
+    return
+  }
+
+  const selectedDepartment =
+    departments.find(
+      (department) =>
+        department.id ===
+        selectedDepartmentId
+    )
+
+  const selectedOfficer =
+    officers.find(
+      (officer) =>
+        officer.id ===
+        selectedOfficerId
+    )
+
+  if (
+    !selectedDepartment ||
+    !selectedOfficer
+  ) {
+    setErrorMessage(
+      "Invalid department or officer."
     )
     return
   }
@@ -214,10 +338,10 @@ const assignReport = async () => {
 
         body: JSON.stringify({
           department:
-            department.trim(),
+            selectedDepartment.name,
 
           assigned_to:
-            assignedTo.trim(),
+            selectedOfficer.name,
         }),
       }
     )
@@ -233,14 +357,6 @@ const assignReport = async () => {
     }
 
     setReport(data.report)
-
-    setDepartment(
-      data.report.department || ""
-    )
-
-    setAssignedTo(
-      data.report.assigned_to || ""
-    )
 
     setSuccessMessage(
       "Report assigned successfully."
@@ -492,66 +608,70 @@ const assignReport = async () => {
   <div className="mt-5 grid gap-5 sm:grid-cols-2">
 
     <div>
-      <label className="block text-sm font-semibold text-gray-700">
-        Department
-      </label>
+  <label className="block text-sm font-semibold text-gray-700">
+    Department
+  </label>
 
-      <select
-        value={department}
-        onChange={(event) =>
-          setDepartment(
-            event.target.value
-          )
-        }
-        className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none"
-      >
-        <option value="">
-          Select Department
-        </option>
+  <select
+    value={selectedDepartmentId}
+    onChange={(event) =>
+      setSelectedDepartmentId(
+        event.target.value
+      )
+    }
+    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none"
+  >
+    <option value="">
+      Select Department
+    </option>
 
-        <option value="Public Works">
-          Public Works
+    {departments.map(
+      (department) => (
+        <option
+          key={department.id}
+          value={department.id}
+        >
+          {department.name}
         </option>
-
-        <option value="Sanitation">
-          Sanitation
-        </option>
-
-        <option value="Water Department">
-          Water Department
-        </option>
-
-        <option value="Street Lighting">
-          Street Lighting
-        </option>
-
-        <option value="Sewage Department">
-          Sewage Department
-        </option>
-
-        <option value="Other">
-          Other
-        </option>
-      </select>
-    </div>
+      )
+    )}
+  </select>
+</div>
 
     <div>
-      <label className="block text-sm font-semibold text-gray-700">
-        Officer / Staff
-      </label>
+  <label className="block text-sm font-semibold text-gray-700">
+    Officer / Staff
+  </label>
 
-      <input
-        type="text"
-        value={assignedTo}
-        onChange={(event) =>
-          setAssignedTo(
-            event.target.value
-          )
-        }
-        placeholder="Enter officer name"
-        className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-600 focus:outline-none"
-      />
-    </div>
+  <select
+    value={selectedOfficerId}
+    onChange={(event) =>
+      setSelectedOfficerId(
+        event.target.value
+      )
+    }
+    disabled={
+      !selectedDepartmentId ||
+      isLoadingOfficers
+    }
+    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none disabled:bg-gray-100"
+  >
+    <option value="">
+      {isLoadingOfficers
+        ? "Loading officers..."
+        : "Select Officer"}
+    </option>
+
+    {officers.map((officer) => (
+      <option
+        key={officer.id}
+        value={officer.id}
+      >
+        {officer.name} - {officer.email}
+      </option>
+    ))}
+  </select>
+</div>
 
   </div>
 

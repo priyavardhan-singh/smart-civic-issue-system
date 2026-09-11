@@ -29,3 +29,12 @@ class UserProfileUpdate(BaseModel):
 class ReportAssignment(BaseModel):
     department: str
     assigned_to: str
+
+class DepartmentCreate(BaseModel):
+    name: str
+
+
+class OfficerCreate(BaseModel):
+    name: str
+    email: str
+    department_id: str

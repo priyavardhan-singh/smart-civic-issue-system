@@ -8,6 +8,7 @@ import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import MyReports from './pages/MyReports'
 import Profile from './pages/Profile'
+import AdminManagement from './pages/AdminManagement'
 function App() {
   return (
     <BrowserRouter>
@@ -26,7 +27,14 @@ function App() {
   path="/admin/reports/:reportId"
   element={<AdminReportDetails />}
 />
+        <Route
+  path="/admin/manage"
+  element={<AdminManagement />}
+/>
+         
       </Routes>
+
+      
 
     </BrowserRouter>
   )

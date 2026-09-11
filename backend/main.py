@@ -14,6 +14,8 @@ from models import (
     UserLogin,
     UserProfileUpdate,
     ReportAssignment,
+    DepartmentCreate,
+    OfficerCreate,
 )
 from auth import (
     hash_password,
@@ -372,6 +374,177 @@ def assign_report(
         "message": "Report assigned successfully",
         "report": updated_report
     }
+
+@app.post("/departments")
+def create_department(
+    department: DepartmentCreate,
+    current_admin = Security(get_current_admin)
+):
+    name = department.name.strip()
+
+    if not name:
+        raise HTTPException(
+            status_code=400,
+            detail="Department name cannot be empty"
+        )
+
+    existing_department = db.departments.find_one({
+        "name": {
+            "$regex": f"^{name}$",
+            "$options": "i"
+        }
+    })
+
+    if existing_department:
+        raise HTTPException(
+            status_code=400,
+            detail="Department already exists"
+        )
+
+    department_data = {
+        "name": name,
+        "created_at": datetime.now(
+            timezone.utc
+        ),
+    }
+
+    result = db.departments.insert_one(
+        department_data
+    )
+
+    return {
+        "message": "Department created successfully",
+        "department": {
+            "id": str(result.inserted_id),
+            "name": name,
+        }
+    }
+
+
+@app.get("/departments")
+def get_departments(
+    current_admin = Security(get_current_admin)
+):
+    departments = []
+
+    for department in db.departments.find().sort(
+        "name",
+        1
+    ):
+        departments.append({
+            "id": str(department["_id"]),
+            "name": department["name"],
+        })
+
+    return departments
+
+@app.post("/officers")
+def create_officer(
+    officer: OfficerCreate,
+    current_admin = Security(get_current_admin)
+):
+    name = officer.name.strip()
+    email = officer.email.lower().strip()
+    department_id = officer.department_id.strip()
+
+    if not name:
+        raise HTTPException(
+            status_code=400,
+            detail="Officer name cannot be empty"
+        )
+
+    if not email:
+        raise HTTPException(
+            status_code=400,
+            detail="Officer email cannot be empty"
+        )
+
+    if not ObjectId.is_valid(department_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid department ID"
+        )
+
+    department = db.departments.find_one({
+        "_id": ObjectId(department_id)
+    })
+
+    if not department:
+        raise HTTPException(
+            status_code=404,
+            detail="Department not found"
+        )
+
+    existing_officer = db.officers.find_one({
+        "email": email
+    })
+
+    if existing_officer:
+        raise HTTPException(
+            status_code=400,
+            detail="Officer email already exists"
+        )
+
+    officer_data = {
+        "name": name,
+        "email": email,
+        "department_id": department_id,
+        "created_at": datetime.now(
+            timezone.utc
+        ),
+    }
+
+    result = db.officers.insert_one(
+        officer_data
+    )
+
+    return {
+        "message": "Officer created successfully",
+        "officer": {
+            "id": str(result.inserted_id),
+            "name": name,
+            "email": email,
+            "department_id": department_id,
+            "department_name": department["name"],
+        }
+    }
+
+
+@app.get("/departments/{department_id}/officers")
+def get_department_officers(
+    department_id: str,
+    current_admin = Security(get_current_admin)
+):
+    if not ObjectId.is_valid(department_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid department ID"
+        )
+
+    department = db.departments.find_one({
+        "_id": ObjectId(department_id)
+    })
+
+    if not department:
+        raise HTTPException(
+            status_code=404,
+            detail="Department not found"
+        )
+
+    officers = []
+
+    for officer in db.officers.find({
+        "department_id": department_id
+    }).sort("name", 1):
+        officers.append({
+            "id": str(officer["_id"]),
+            "name": officer["name"],
+            "email": officer["email"],
+            "department_id": officer["department_id"],
+            "department_name": department["name"],
+        })
+
+    return officers
 
 @app.post("/login")
 def login_user(user: UserLogin):

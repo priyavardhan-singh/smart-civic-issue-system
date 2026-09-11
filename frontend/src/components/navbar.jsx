@@ -69,18 +69,25 @@ function Navbar() {
           {isAdmin ? (
             <>
               <Link
-                to="/admin"
-                className="text-gray-700 hover:text-blue-700"
-              >
-                Dashboard
-              </Link>
+  to="/admin"
+  className="text-gray-700 hover:text-blue-700"
+>
+  Dashboard
+</Link>
 
-              <Link
-                to="/profile"
-                className="text-gray-700 hover:text-blue-700"
-              >
-                Profile
-              </Link>
+<Link
+  to="/admin/manage"
+  className="text-gray-700 hover:text-blue-700"
+>
+  Departments & Officers
+</Link>
+
+<Link
+  to="/profile"
+  className="text-gray-700 hover:text-blue-700"
+>
+  Profile
+</Link>
             </>
           ) : (
             <>
