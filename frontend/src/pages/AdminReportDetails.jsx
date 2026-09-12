@@ -9,6 +9,7 @@ const API_URL = "http://127.0.0.1:8000"
 
 function AdminReportDetails() {
   const { reportId } = useParams()
+  const navigate = useNavigate()
 
   const [report, setReport] =
     useState(null)
@@ -19,35 +20,37 @@ function AdminReportDetails() {
   const [errorMessage, setErrorMessage] =
     useState("")
 
+  const [successMessage, setSuccessMessage] =
+    useState("")
+
   const [isUpdating, setIsUpdating] =
     useState(false)
 
-const [departments, setDepartments] =
-  useState([])
+  const [departments, setDepartments] =
+    useState([])
 
-const [officers, setOfficers] =
-  useState([])
+  const [officers, setOfficers] =
+    useState([])
 
-const [
-  selectedDepartmentId,
-  setSelectedDepartmentId,
-] = useState("")
+  const [
+    selectedDepartmentId,
+    setSelectedDepartmentId,
+  ] = useState("")
 
-const [
-  selectedOfficerId,
-  setSelectedOfficerId,
-] = useState("")
+  const [
+    selectedOfficerId,
+    setSelectedOfficerId,
+  ] = useState("")
 
-const [isLoadingOfficers, setIsLoadingOfficers] =
-  useState(false)
+  const [
+    isLoadingOfficers,
+    setIsLoadingOfficers,
+  ] = useState(false)
 
-const [isAssigning, setIsAssigning] =
-  useState(false)
+  const [isAssigning, setIsAssigning] =
+    useState(false)
 
-const [successMessage, setSuccessMessage] =
-  useState("")
-  const navigate = useNavigate()
-
+  // Load report
   useEffect(() => {
     const loadReport = async () => {
       const token =
@@ -97,13 +100,13 @@ const [successMessage, setSuccessMessage] =
 
         if (!response.ok) {
           throw new Error(
-            data.detail ||
-              "Unable to load report."
+            typeof data.detail === "string"
+              ? data.detail
+              : "Unable to load report."
           )
         }
 
         setReport(data)
-
       } catch (error) {
         setErrorMessage(
           error instanceof Error
@@ -118,100 +121,104 @@ const [successMessage, setSuccessMessage] =
     loadReport()
   }, [reportId, navigate])
 
-useEffect(() => {
-  const loadDepartments = async () => {
-    try {
-      const token =
-        localStorage.getItem(
-          "access_token"
+  // Load departments
+  useEffect(() => {
+    const loadDepartments = async () => {
+      try {
+        const token =
+          localStorage.getItem(
+            "access_token"
+          )
+
+        const response = await fetch(
+          `${API_URL}/departments`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+          }
         )
 
-      const response = await fetch(
-        `${API_URL}/departments`,
-        {
-          headers: {
-            Authorization:
-              `Bearer ${token}`,
-          },
+        const data =
+          await response.json()
+
+        if (!response.ok) {
+          throw new Error(
+            typeof data.detail === "string"
+              ? data.detail
+              : "Unable to load departments."
+          )
         }
-      )
 
-      const data =
-        await response.json()
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail ||
-            "Unable to load departments."
+        setDepartments(data)
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to load departments."
         )
       }
-
-      setDepartments(data)
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to load departments."
-      )
     }
-  }
 
-  loadDepartments()
-}, [])
+    loadDepartments()
+  }, [])
 
-useEffect(() => {
-  const loadOfficers = async () => {
-    if (!selectedDepartmentId) {
-      setOfficers([])
+  // Load officers when department changes
+  useEffect(() => {
+    const loadOfficers = async () => {
+      if (!selectedDepartmentId) {
+        setOfficers([])
+        setSelectedOfficerId("")
+        return
+      }
+
+      setIsLoadingOfficers(true)
       setSelectedOfficerId("")
-      return
-    }
 
-    setIsLoadingOfficers(true)
-    setSelectedOfficerId("")
+      try {
+        const token =
+          localStorage.getItem(
+            "access_token"
+          )
 
-    try {
-      const token =
-        localStorage.getItem(
-          "access_token"
+        const response = await fetch(
+          `${API_URL}/departments/${selectedDepartmentId}/officers`,
+          {
+            headers: {
+              Authorization:
+                `Bearer ${token}`,
+            },
+          }
         )
 
-      const response = await fetch(
-        `${API_URL}/departments/${selectedDepartmentId}/officers`,
-        {
-          headers: {
-            Authorization:
-              `Bearer ${token}`,
-          },
+        const data =
+          await response.json()
+
+        if (!response.ok) {
+          throw new Error(
+            typeof data.detail === "string"
+              ? data.detail
+              : "Unable to load officers."
+          )
         }
-      )
 
-      const data =
-        await response.json()
+        setOfficers(data)
+      } catch (error) {
+        setOfficers([])
 
-      if (!response.ok) {
-        throw new Error(
-          data.detail ||
-            "Unable to load officers."
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to load officers."
         )
+      } finally {
+        setIsLoadingOfficers(false)
       }
-
-      setOfficers(data)
-    } catch (error) {
-      setOfficers([])
-
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to load officers."
-      )
-    } finally {
-      setIsLoadingOfficers(false)
     }
-  }
 
-  loadOfficers()
-}, [selectedDepartmentId])
+    loadOfficers()
+  }, [selectedDepartmentId])
 
   const updateStatus = async (
     newStatus
@@ -222,6 +229,7 @@ useEffect(() => {
 
     setIsUpdating(true)
     setErrorMessage("")
+    setSuccessMessage("")
 
     try {
       const token =
@@ -253,8 +261,9 @@ useEffect(() => {
 
       if (!response.ok) {
         throw new Error(
-          data.detail ||
-            "Unable to update status."
+          typeof data.detail === "string"
+            ? data.detail
+            : "Unable to update status."
         )
       }
 
@@ -262,6 +271,10 @@ useEffect(() => {
         ...current,
         status: newStatus,
       }))
+
+      setSuccessMessage(
+        "Report status updated successfully."
+      )
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -273,94 +286,110 @@ useEffect(() => {
     }
   }
 
-const assignReport = async () => {
-  setErrorMessage("")
-  setSuccessMessage("")
+  const assignReport = async () => {
+    setErrorMessage("")
+    setSuccessMessage("")
 
-  if (!selectedDepartmentId) {
-    setErrorMessage(
-      "Please select a department."
-    )
-    return
-  }
-
-  if (!selectedOfficerId) {
-    setErrorMessage(
-      "Please select an officer."
-    )
-    return
-  }
-
-  setIsAssigning(true)
-
-  try {
-    const token =
-      localStorage.getItem(
-        "access_token"
-      )
-
-    const response = await fetch(
-      `${API_URL}/reports/${report._id}/assign`,
-      {
-        method: "PATCH",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-
-          Authorization:
-            `Bearer ${token}`,
-        },
-
-        body: JSON.stringify({
-          department_id:
-            selectedDepartmentId,
-
-          officer_id:
-            selectedOfficerId,
-        }),
-      }
-    )
-
-    const data =
-      await response.json()
-
-    if (!response.ok) {
-      let message =
-        "Unable to assign report."
-
-      if (typeof data.detail === "string") {
-        message = data.detail
-      }
-
-      if (Array.isArray(data.detail)) {
-        message = data.detail
-          .map(
-            (error) =>
-              error.msg ||
-              "Invalid assignment data"
-          )
-          .join(", ")
-      }
-
-      throw new Error(message)
+    if (!report) {
+      return
     }
 
-    setReport(data.report)
+    if (report.status === "resolved") {
+      setErrorMessage(
+        "Resolved reports cannot be reassigned."
+      )
+      return
+    }
 
-    setSuccessMessage(
-      "Report assigned successfully."
-    )
-  } catch (error) {
-    setErrorMessage(
-      error instanceof Error
-        ? error.message
-        : "Unable to assign report."
-    )
-  } finally {
-    setIsAssigning(false)
+    if (!selectedDepartmentId) {
+      setErrorMessage(
+        "Please select a department."
+      )
+      return
+    }
+
+    if (!selectedOfficerId) {
+      setErrorMessage(
+        "Please select an officer."
+      )
+      return
+    }
+
+    setIsAssigning(true)
+
+    try {
+      const token =
+        localStorage.getItem(
+          "access_token"
+        )
+
+      const response = await fetch(
+        `${API_URL}/reports/${report._id}/assign`,
+        {
+          method: "PATCH",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            Authorization:
+              `Bearer ${token}`,
+          },
+
+          body: JSON.stringify({
+            department_id:
+              selectedDepartmentId,
+
+            officer_id:
+              selectedOfficerId,
+          }),
+        }
+      )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        let message =
+          "Unable to assign report."
+
+        if (
+          typeof data.detail ===
+          "string"
+        ) {
+          message = data.detail
+        }
+
+        if (
+          Array.isArray(data.detail)
+        ) {
+          message = data.detail
+            .map(
+              (error) =>
+                error.msg ||
+                "Invalid assignment data"
+            )
+            .join(", ")
+        }
+
+        throw new Error(message)
+      }
+
+      setReport(data.report)
+
+      setSuccessMessage(
+        "Report assigned successfully."
+      )
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to assign report."
+      )
+    } finally {
+      setIsAssigning(false)
+    }
   }
-}
 
   const formatCategory = (
     category
@@ -368,14 +397,19 @@ const assignReport = async () => {
     const categories = {
       road:
         "Road Damage / Pothole",
+
       streetlight:
         "Streetlight Problem",
+
       garbage:
         "Garbage / Waste",
+
       water:
         "Water / Drainage",
+
       sewage:
         "Sewage Problem",
+
       other:
         "Other",
     }
@@ -386,7 +420,9 @@ const assignReport = async () => {
     )
   }
 
-  const formatStatus = (status) => {
+  const formatStatus = (
+    status
+  ) => {
     return status
       .replaceAll("_", " ")
       .replace(
@@ -412,9 +448,18 @@ const assignReport = async () => {
     return (
       <main className="min-h-screen bg-gray-50 px-4 py-10">
         <div className="mx-auto max-w-5xl">
+
           <p className="text-red-700">
             {errorMessage}
           </p>
+
+          <Link
+            to="/admin"
+            className="mt-4 inline-block font-medium text-blue-700"
+          >
+            ← Back to Dashboard
+          </Link>
+
         </div>
       </main>
     )
@@ -437,6 +482,7 @@ const assignReport = async () => {
         </Link>
 
         <div className="mt-5">
+
           <h1 className="text-3xl font-bold text-gray-900">
             Report Details
           </h1>
@@ -444,6 +490,7 @@ const assignReport = async () => {
           <p className="mt-2 text-gray-600">
             Review the complete citizen report.
           </p>
+
         </div>
 
         {errorMessage && (
@@ -453,12 +500,14 @@ const assignReport = async () => {
         )}
 
         {successMessage && (
-  <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700">
-    {successMessage}
-  </div>
-)}
+          <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700">
+            {successMessage}
+          </div>
+        )}
 
         <div className="mt-8 overflow-hidden rounded-xl border bg-white shadow-sm">
+
+          {/* ORIGINAL ISSUE PHOTO */}
 
           {report.photo_url && (
             <div className="flex min-h-80 w-full items-center justify-center bg-gray-100 p-4">
@@ -474,9 +523,12 @@ const assignReport = async () => {
 
           <div className="p-6">
 
+            {/* BASIC INFORMATION */}
+
             <div className="flex flex-col justify-between gap-4 sm:flex-row">
 
               <div>
+
                 <p className="text-sm font-medium text-gray-500">
                   Issue Category
                 </p>
@@ -486,19 +538,25 @@ const assignReport = async () => {
                     report.category
                   )}
                 </h2>
+
               </div>
 
               <div>
+
                 <span className="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
                   {formatStatus(
                     report.status
                   )}
                 </span>
+
               </div>
 
             </div>
 
+            {/* DESCRIPTION */}
+
             <div className="mt-8">
+
               <p className="text-sm font-semibold text-gray-500">
                 Description
               </p>
@@ -506,7 +564,10 @@ const assignReport = async () => {
               <p className="mt-2 whitespace-pre-wrap leading-7 text-gray-800">
                 {report.description}
               </p>
+
             </div>
+
+            {/* LOCATION */}
 
             <div className="mt-8 rounded-xl bg-gray-50 p-5">
 
@@ -522,6 +583,7 @@ const assignReport = async () => {
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
 
                 <div>
+
                   <p className="text-sm text-gray-500">
                     Latitude
                   </p>
@@ -529,9 +591,11 @@ const assignReport = async () => {
                   <p className="font-medium text-gray-900">
                     {report.latitude}
                   </p>
+
                 </div>
 
                 <div>
+
                   <p className="text-sm text-gray-500">
                     Longitude
                   </p>
@@ -539,15 +603,19 @@ const assignReport = async () => {
                   <p className="font-medium text-gray-900">
                     {report.longitude}
                   </p>
+
                 </div>
 
               </div>
 
             </div>
 
+            {/* REPORT IDS */}
+
             <div className="mt-8 grid gap-5 sm:grid-cols-2">
 
               <div>
+
                 <p className="text-sm text-gray-500">
                   Report ID
                 </p>
@@ -555,9 +623,11 @@ const assignReport = async () => {
                 <p className="mt-1 break-all font-medium text-gray-900">
                   {report._id}
                 </p>
+
               </div>
 
               <div>
+
                 <p className="text-sm text-gray-500">
                   Citizen User ID
                 </p>
@@ -566,12 +636,14 @@ const assignReport = async () => {
                   {report.user_id ||
                     "Unavailable"}
                 </p>
+
               </div>
 
             </div>
 
             {report.created_at && (
               <div className="mt-5">
+
                 <p className="text-sm text-gray-500">
                   Reported On
                 </p>
@@ -581,249 +653,332 @@ const assignReport = async () => {
                     report.created_at
                   ).toLocaleString()}
                 </p>
+
               </div>
             )}
 
-          {report.status === "resolved" && (
-  <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-5">
+            {/* RESOLUTION PROOF */}
 
-    <h3 className="text-xl font-bold text-green-900">
-      Resolution Proof
-    </h3>
+            {report.status ===
+              "resolved" && (
+              <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-5">
 
-    <p className="mt-1 text-sm text-green-800">
-      Evidence submitted by the assigned officer
-      after completing the civic issue.
-    </p>
+                <h3 className="text-xl font-bold text-green-900">
+                  Resolution Proof
+                </h3>
 
-    {report.resolution_photo_url && (
-      <div className="mt-5">
+                <p className="mt-1 text-sm text-green-800">
+                  Evidence submitted by the assigned
+                  officer after completing the civic
+                  issue.
+                </p>
 
-        <p className="text-sm font-semibold text-gray-700">
-          Resolution Photo
-        </p>
+                {report.resolution_photo_url && (
+                  <div className="mt-5">
 
-        <div className="mt-2 flex items-center justify-center rounded-lg border bg-white p-3">
+                    <p className="text-sm font-semibold text-gray-700">
+                      Resolution Photo
+                    </p>
 
-          <img
-            src={`${API_URL}${report.resolution_photo_url}`}
-            alt="Officer resolution proof"
-            className="max-h-[500px] w-full object-contain"
-          />
+                    <div className="mt-2 flex items-center justify-center rounded-lg border bg-white p-3">
 
-        </div>
+                      <img
+                        src={`${API_URL}${report.resolution_photo_url}`}
+                        alt="Officer resolution proof"
+                        className="max-h-[500px] w-full object-contain"
+                      />
 
-      </div>
-    )}
+                    </div>
 
-    {report.resolution_remarks && (
-      <div className="mt-5">
+                  </div>
+                )}
 
-        <p className="text-sm font-semibold text-gray-700">
-          Officer Remarks
-        </p>
+                {report.resolution_remarks && (
+                  <div className="mt-5">
 
-        <p className="mt-2 whitespace-pre-wrap leading-7 text-gray-800">
-          {report.resolution_remarks}
-        </p>
+                    <p className="text-sm font-semibold text-gray-700">
+                      Officer Remarks
+                    </p>
 
-      </div>
-    )}
+                    <p className="mt-2 whitespace-pre-wrap leading-7 text-gray-800">
+                      {
+                        report.resolution_remarks
+                      }
+                    </p>
 
-    {report.resolved_at && (
-      <div className="mt-5">
+                  </div>
+                )}
 
-        <p className="text-sm font-semibold text-gray-700">
-          Resolved On
-        </p>
+                {report.work_started_at && (
+                  <div className="mt-5">
 
-        <p className="mt-1 text-gray-800">
-          {new Date(
-            report.resolved_at
-          ).toLocaleString()}
-        </p>
+                    <p className="text-sm font-semibold text-gray-700">
+                      Work Started On
+                    </p>
 
-      </div>
-    )}
+                    <p className="mt-1 text-gray-800">
+                      {new Date(
+                        report.work_started_at
+                      ).toLocaleString()}
+                    </p>
 
-    {report.work_started_at && (
-      <div className="mt-5">
+                  </div>
+                )}
 
-        <p className="text-sm font-semibold text-gray-700">
-          Work Started On
-        </p>
+                {report.resolved_at && (
+                  <div className="mt-5">
 
-        <p className="mt-1 text-gray-800">
-          {new Date(
-            report.work_started_at
-          ).toLocaleString()}
-        </p>
+                    <p className="text-sm font-semibold text-gray-700">
+                      Resolved On
+                    </p>
 
-      </div>
-    )}
+                    <p className="mt-1 text-gray-800">
+                      {new Date(
+                        report.resolved_at
+                      ).toLocaleString()}
+                    </p>
 
-  </div>
-)}
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* ASSIGNMENT */}
 
             <div className="mt-8 border-t pt-6">
 
-  <h3 className="text-xl font-bold text-gray-900">
-    Assign Report
-  </h3>
+              <h3 className="text-xl font-bold text-gray-900">
+                Assign Report
+              </h3>
 
-  <p className="mt-1 text-sm text-gray-600">
-    Assign this civic issue to the responsible
-    department and officer.
-  </p>
+              {report.status ===
+              "resolved" ? (
 
-  <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
 
-    <div>
-  <label className="block text-sm font-semibold text-gray-700">
-    Department
-  </label>
+                  <p className="font-semibold text-green-800">
+                    This report has already been resolved.
+                  </p>
 
-  <select
-    value={selectedDepartmentId}
-    onChange={(event) =>
-      setSelectedDepartmentId(
-        event.target.value
-      )
-    }
-    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none"
-  >
-    <option value="">
-      Select Department
-    </option>
+                  <p className="mt-1 text-sm text-green-700">
+                    Resolved reports cannot be reassigned.
+                  </p>
 
-    {departments.map(
-      (department) => (
-        <option
-          key={department.id}
-          value={department.id}
-        >
-          {department.name}
-        </option>
-      )
-    )}
-  </select>
-</div>
+                </div>
 
-    <div>
-  <label className="block text-sm font-semibold text-gray-700">
-    Officer / Staff
-  </label>
+              ) : (
+                <>
 
-  <select
-    value={selectedOfficerId}
-    onChange={(event) =>
-      setSelectedOfficerId(
-        event.target.value
-      )
-    }
-    disabled={
-      !selectedDepartmentId ||
-      isLoadingOfficers
-    }
-    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none disabled:bg-gray-100"
-  >
-    <option value="">
-      {isLoadingOfficers
-        ? "Loading officers..."
-        : "Select Officer"}
-    </option>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Assign this civic issue to the
+                    responsible department and
+                    officer.
+                  </p>
 
-    {officers.map((officer) => (
-      <option
-        key={officer.id}
-        value={officer.id}
-      >
-        {officer.name} - {officer.email}
-      </option>
-    ))}
-  </select>
-</div>
+                  <div className="mt-5 grid gap-5 sm:grid-cols-2">
 
-  </div>
+                    <div>
 
-  <button
-    type="button"
-    onClick={assignReport}
-    disabled={isAssigning}
-    className="mt-5 rounded-lg bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
-  >
-    {isAssigning
-      ? "Assigning..."
-      : "Assign Report"}
-  </button>
+                      <label className="block text-sm font-semibold text-gray-700">
+                        Department
+                      </label>
 
-  {report.department && (
-    <div className="mt-5 rounded-lg bg-blue-50 p-4">
+                      <select
+                        value={
+                          selectedDepartmentId
+                        }
+                        onChange={(event) =>
+                          setSelectedDepartmentId(
+                            event.target.value
+                          )
+                        }
+                        className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none"
+                      >
+                        <option value="">
+                          Select Department
+                        </option>
 
-      <p className="font-semibold text-blue-900">
-        Current Assignment
-      </p>
+                        {departments.map(
+                          (
+                            department
+                          ) => (
+                            <option
+                              key={
+                                department.id
+                              }
+                              value={
+                                department.id
+                              }
+                            >
+                              {
+                                department.name
+                              }
+                            </option>
+                          )
+                        )}
 
-      <p className="mt-2 text-sm text-blue-800">
-        Department: {report.department}
-      </p>
+                      </select>
 
-      <p className="mt-1 text-sm text-blue-800">
-        Assigned To:{" "}
-        {report.assigned_to}
-      </p>
+                    </div>
 
-    </div>
-  )}
+                    <div>
 
-</div>
+                      <label className="block text-sm font-semibold text-gray-700">
+                        Officer / Staff
+                      </label>
 
-           <div className="mt-8 border-t pt-6">
+                      <select
+                        value={
+                          selectedOfficerId
+                        }
+                        onChange={(event) =>
+                          setSelectedOfficerId(
+                            event.target.value
+                          )
+                        }
+                        disabled={
+                          !selectedDepartmentId ||
+                          isLoadingOfficers
+                        }
+                        className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none disabled:bg-gray-100"
+                      >
 
-  <label className="block text-sm font-semibold text-gray-700">
-    Update Report Status
-  </label>
+                        <option value="">
+                          {isLoadingOfficers
+                            ? "Loading officers..."
+                            : "Select Officer"}
+                        </option>
 
-  {report.status === "resolved" ? (
-    <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
-      <p className="font-semibold text-green-800">
-        This report has been resolved with officer proof.
-      </p>
+                        {officers.map(
+                          (officer) => (
+                            <option
+                              key={
+                                officer.id
+                              }
+                              value={
+                                officer.id
+                              }
+                            >
+                              {officer.name}
+                              {" - "}
+                              {officer.email}
+                            </option>
+                          )
+                        )}
 
-      <p className="mt-1 text-sm text-green-700">
-        Resolved reports cannot be manually changed by the admin.
-      </p>
-    </div>
-  ) : (
-    <>
-      <select
-        value={report.status}
-        disabled={isUpdating}
-        onChange={(event) =>
-          updateStatus(event.target.value)
-        }
-        className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none sm:max-w-md"
-      >
-        <option value="reported">
-          Reported
-        </option>
+                      </select>
 
-        <option value="assigned">
-          Assigned
-        </option>
+                    </div>
 
-        <option value="in_progress">
-          In Progress
-        </option>
-      </select>
+                  </div>
 
-      {isUpdating && (
-        <p className="mt-2 text-sm text-gray-500">
-          Updating status...
-        </p>
-      )}
-    </>
-  )}
+                  <button
+                    type="button"
+                    onClick={
+                      assignReport
+                    }
+                    disabled={
+                      isAssigning
+                    }
+                    className="mt-5 rounded-lg bg-blue-700 px-6 py-3 font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+                  >
+                    {isAssigning
+                      ? "Assigning..."
+                      : "Assign Report"}
+                  </button>
+
+                </>
+              )}
+
+              {report.department && (
+                <div className="mt-5 rounded-lg bg-blue-50 p-4">
+
+                  <p className="font-semibold text-blue-900">
+                    Current Assignment
+                  </p>
+
+                  <p className="mt-2 text-sm text-blue-800">
+                    Department:{" "}
+                    {report.department}
+                  </p>
+
+                  <p className="mt-1 text-sm text-blue-800">
+                    Assigned To:{" "}
+                    {report.assigned_to ||
+                      "Unavailable"}
+                  </p>
+
+                </div>
+              )}
+
+            </div>
+
+            {/* STATUS */}
+
+            <div className="mt-8 border-t pt-6">
+
+              <label className="block text-sm font-semibold text-gray-700">
+                Update Report Status
+              </label>
+
+              {report.status ===
+              "resolved" ? (
+
+                <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
+
+                  <p className="font-semibold text-green-800">
+                    This report has been resolved
+                    with officer proof.
+                  </p>
+
+                  <p className="mt-1 text-sm text-green-700">
+                    Resolved reports cannot be
+                    manually changed by the admin.
+                  </p>
+
+                </div>
+
+              ) : (
+                <>
+
+                  <select
+                    value={
+                      report.status
+                    }
+                    disabled={
+                      isUpdating
+                    }
+                    onChange={(event) =>
+                      updateStatus(
+                        event.target.value
+                      )
+                    }
+                    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none sm:max-w-md"
+                  >
+
+                    <option value="reported">
+                      Reported
+                    </option>
+
+                    <option value="assigned">
+                      Assigned
+                    </option>
+
+                    <option value="in_progress">
+                      In Progress
+                    </option>
+
+                  </select>
+
+                  {isUpdating && (
+                    <p className="mt-2 text-sm text-gray-500">
+                      Updating status...
+                    </p>
+                  )}
+
+                </>
+              )}
 
             </div>
 
