@@ -291,30 +291,6 @@ const assignReport = async () => {
     return
   }
 
-  const selectedDepartment =
-    departments.find(
-      (department) =>
-        department.id ===
-        selectedDepartmentId
-    )
-
-  const selectedOfficer =
-    officers.find(
-      (officer) =>
-        officer.id ===
-        selectedOfficerId
-    )
-
-  if (
-    !selectedDepartment ||
-    !selectedOfficer
-  ) {
-    setErrorMessage(
-      "Invalid department or officer."
-    )
-    return
-  }
-
   setIsAssigning(true)
 
   try {
@@ -337,11 +313,11 @@ const assignReport = async () => {
         },
 
         body: JSON.stringify({
-          department:
-            selectedDepartment.name,
+          department_id:
+            selectedDepartmentId,
 
-          assigned_to:
-            selectedOfficer.name,
+          officer_id:
+            selectedOfficerId,
         }),
       }
     )
@@ -350,10 +326,24 @@ const assignReport = async () => {
       await response.json()
 
     if (!response.ok) {
-      throw new Error(
-        data.detail ||
-          "Unable to assign report."
-      )
+      let message =
+        "Unable to assign report."
+
+      if (typeof data.detail === "string") {
+        message = data.detail
+      }
+
+      if (Array.isArray(data.detail)) {
+        message = data.detail
+          .map(
+            (error) =>
+              error.msg ||
+              "Invalid assignment data"
+          )
+          .join(", ")
+      }
+
+      throw new Error(message)
     }
 
     setReport(data.report)

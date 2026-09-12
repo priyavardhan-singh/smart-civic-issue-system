@@ -27,8 +27,8 @@ class UserProfileUpdate(BaseModel):
     email: str
 
 class ReportAssignment(BaseModel):
-    department: str
-    assigned_to: str
+    department_id: str
+    officer_id: str
 
 class DepartmentCreate(BaseModel):
     name: str
@@ -37,4 +37,5 @@ class DepartmentCreate(BaseModel):
 class OfficerCreate(BaseModel):
     name: str
     email: str
+    password: str
     department_id: str

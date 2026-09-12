@@ -22,6 +22,9 @@ function AdminManagement() {
   const [officerEmail, setOfficerEmail] =
     useState("")
 
+  const [officerPassword, setOfficerPassword] =
+    useState("")
+
   const [isLoading, setIsLoading] =
     useState(true)
 
@@ -87,7 +90,8 @@ function AdminManagement() {
         }
       )
 
-      const data = await response.json()
+      const data =
+        await response.json()
 
       if (response.status === 401) {
         localStorage.removeItem(
@@ -266,6 +270,20 @@ function AdminManagement() {
       return
     }
 
+    if (!officerPassword) {
+      setErrorMessage(
+        "Please enter officer password."
+      )
+      return
+    }
+
+    if (officerPassword.length < 6) {
+      setErrorMessage(
+        "Officer password must be at least 6 characters."
+      )
+      return
+    }
+
     setIsAddingOfficer(true)
 
     try {
@@ -295,6 +313,9 @@ function AdminManagement() {
                 .trim()
                 .toLowerCase(),
 
+            password:
+              officerPassword,
+
             department_id:
               selectedDepartmentId,
           }),
@@ -313,9 +334,10 @@ function AdminManagement() {
 
       setOfficerName("")
       setOfficerEmail("")
+      setOfficerPassword("")
 
       setSuccessMessage(
-        "Officer created successfully."
+        "Officer account created successfully. The officer can now log in."
       )
 
       await loadOfficers(
@@ -354,8 +376,9 @@ function AdminManagement() {
           </h1>
 
           <p className="mt-2 text-gray-600">
-            Manage departments and officers used
-            for assigning civic reports.
+            Manage departments and officer
+            accounts used for assigning civic
+            reports.
           </p>
         </div>
 
@@ -483,8 +506,8 @@ function AdminManagement() {
             </h2>
 
             <p className="mt-1 text-sm text-gray-600">
-              Add officers and connect them with a
-              department.
+              Create officer login accounts and
+              connect them with departments.
             </p>
 
             <form
@@ -563,9 +586,34 @@ function AdminManagement() {
                       event.target.value
                     )
                   }
-                  placeholder="officer@example.com"
+                  placeholder="officer@smartcivic.com"
                   className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-600 focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700">
+                  Officer Password
+                </label>
+
+                <input
+                  type="password"
+                  value={officerPassword}
+                  onChange={(event) =>
+                    setOfficerPassword(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Minimum 6 characters"
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-600 focus:outline-none"
+                />
+
+                <p className="mt-1 text-xs text-gray-500">
+                  The officer will use this email
+                  and password to log in.
+                </p>
               </div>
 
               <button
@@ -576,8 +624,8 @@ function AdminManagement() {
                 className="w-full rounded-lg bg-green-700 px-4 py-3 font-semibold text-white hover:bg-green-800 disabled:opacity-60"
               >
                 {isAddingOfficer
-                  ? "Adding..."
-                  : "Add Officer"}
+                  ? "Creating Account..."
+                  : "Create Officer Account"}
               </button>
 
             </form>

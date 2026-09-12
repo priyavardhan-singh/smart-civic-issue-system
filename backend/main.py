@@ -99,6 +99,17 @@ def get_current_admin(
 
     return current_user
 
+def get_current_officer(
+    current_user = Security(get_current_user)
+):
+    if current_user.get("role") != "officer":
+        raise HTTPException(
+            status_code=403,
+            detail="Officer access required"
+        )
+
+    return current_user
+
 @app.get("/")
 def root():
     return {"message": "Smart Civic API is running"}
@@ -322,20 +333,57 @@ def assign_report(
             detail="Invalid report ID"
         )
 
-    department = assignment.department.strip()
-    assigned_to = assignment.assigned_to.strip()
+    if not ObjectId.is_valid(
+        assignment.department_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid department ID"
+        )
+
+    if not ObjectId.is_valid(
+        assignment.officer_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid officer ID"
+        )
+
+    department = db.departments.find_one({
+        "_id": ObjectId(
+            assignment.department_id
+        )
+    })
 
     if not department:
         raise HTTPException(
-            status_code=400,
-            detail="Department cannot be empty"
+            status_code=404,
+            detail="Department not found"
         )
 
-    if not assigned_to:
+    officer = db.officers.find_one({
+        "_id": ObjectId(
+            assignment.officer_id
+        )
+    })
+
+    if not officer:
+        raise HTTPException(
+            status_code=404,
+            detail="Officer not found"
+        )
+
+    if (
+        officer["department_id"]
+        != assignment.department_id
+    ):
         raise HTTPException(
             status_code=400,
-            detail="Assigned officer cannot be empty"
+            detail=
+                "Officer does not belong to selected department"
         )
+
+    now = datetime.now(timezone.utc)
 
     result = db.reports.update_one(
         {
@@ -343,15 +391,23 @@ def assign_report(
         },
         {
             "$set": {
-                "department": department,
-                "assigned_to": assigned_to,
-                "assigned_at": datetime.now(
-                    timezone.utc
-                ),
+                "department_id":
+                    assignment.department_id,
+
+                "department":
+                    department["name"],
+
+                "assigned_officer_id":
+                    assignment.officer_id,
+
+                "assigned_to":
+                    officer["name"],
+
+                "assigned_at": now,
+
                 "status": "assigned",
-                "updated_at": datetime.now(
-                    timezone.utc
-                ),
+
+                "updated_at": now,
             }
         }
     )
@@ -371,8 +427,139 @@ def assign_report(
     )
 
     return {
-        "message": "Report assigned successfully",
+        "message":
+            "Report assigned successfully",
         "report": updated_report
+    }
+
+@app.get("/officer/reports")
+def get_officer_reports(
+    current_officer =
+        Security(get_current_officer)
+):
+    officer_id = current_officer.get(
+        "officer_id"
+    )
+
+    if not officer_id:
+        raise HTTPException(
+            status_code=400,
+            detail=
+                "Officer account is not linked correctly"
+        )
+
+    reports = []
+
+    for report in db.reports.find({
+        "assigned_officer_id":
+            officer_id
+    }).sort("created_at", -1):
+
+        report["_id"] = str(
+            report["_id"]
+        )
+
+        reports.append(report)
+
+    return reports
+
+@app.patch("/officer/reports/{report_id}/status")
+def update_officer_report_status(
+    report_id: str,
+    status_update: ReportStatusUpdate,
+    current_officer = Security(get_current_officer)
+):
+    if not ObjectId.is_valid(report_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid report ID"
+        )
+
+    officer_id = current_officer.get(
+        "officer_id"
+    )
+
+    if not officer_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Officer account is not linked correctly"
+        )
+
+    report = db.reports.find_one({
+        "_id": ObjectId(report_id),
+        "assigned_officer_id": officer_id
+    })
+
+    if not report:
+        raise HTTPException(
+            status_code=404,
+            detail="Assigned report not found"
+        )
+
+    current_status = report.get(
+        "status"
+    )
+
+    allowed_transitions = {
+        "assigned": "in_progress",
+        "in_progress": "resolved"
+    }
+
+    next_status = allowed_transitions.get(
+        current_status
+    )
+
+    if not next_status:
+        raise HTTPException(
+            status_code=400,
+            detail="This report cannot be updated further"
+        )
+
+    if status_update.status != next_status:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Status must change from "
+                f"{current_status} to "
+                f"{next_status}"
+            )
+        )
+
+    now = datetime.now(
+        timezone.utc
+    )
+
+    update_data = {
+        "status": status_update.status,
+        "updated_at": now
+    }
+
+    if status_update.status == "in_progress":
+        update_data[
+            "work_started_at"
+        ] = now
+
+    if status_update.status == "resolved":
+        update_data[
+            "resolved_at"
+        ] = now
+
+    db.reports.update_one(
+        {
+            "_id": ObjectId(report_id),
+            "assigned_officer_id":
+                officer_id
+        },
+        {
+            "$set": update_data
+        }
+    )
+
+    return {
+        "message":
+            "Report status updated successfully",
+        "status":
+            status_update.status
     }
 
 @app.post("/departments")
@@ -445,6 +632,7 @@ def create_officer(
 ):
     name = officer.name.strip()
     email = officer.email.lower().strip()
+    password = officer.password
     department_id = officer.department_id.strip()
 
     if not name:
@@ -457,6 +645,18 @@ def create_officer(
         raise HTTPException(
             status_code=400,
             detail="Officer email cannot be empty"
+        )
+
+    if not password:
+        raise HTTPException(
+            status_code=400,
+            detail="Officer password cannot be empty"
+        )
+
+    if len(password) < 6:
+        raise HTTPException(
+            status_code=400,
+            detail="Officer password must be at least 6 characters"
         )
 
     if not ObjectId.is_valid(department_id):
@@ -485,30 +685,83 @@ def create_officer(
             detail="Officer email already exists"
         )
 
+    existing_user = db.users.find_one({
+        "email": email
+    })
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered as a user"
+        )
+
+    now = datetime.now(timezone.utc)
+
+    # First create officer record
     officer_data = {
         "name": name,
         "email": email,
         "department_id": department_id,
-        "created_at": datetime.now(
-            timezone.utc
-        ),
+        "created_at": now,
     }
 
-    result = db.officers.insert_one(
+    officer_result = db.officers.insert_one(
         officer_data
     )
 
-    return {
-        "message": "Officer created successfully",
-        "officer": {
-            "id": str(result.inserted_id),
-            "name": name,
-            "email": email,
-            "department_id": department_id,
-            "department_name": department["name"],
-        }
+    officer_id = str(
+        officer_result.inserted_id
+    )
+
+    # Create login account for officer
+    user_data = {
+        "name": name,
+        "email": email,
+        "password_hash": hash_password(
+            password
+        ),
+        "role": "officer",
+        "officer_id": officer_id,
+        "department_id": department_id,
+        "created_at": now,
     }
 
+    user_result = db.users.insert_one(
+        user_data
+    )
+
+    # Link officer record back to user account
+    db.officers.update_one(
+        {
+            "_id": officer_result.inserted_id
+        },
+        {
+            "$set": {
+                "user_id": str(
+                    user_result.inserted_id
+                )
+            }
+        }
+    )
+
+    return {
+        "message":
+            "Officer created successfully",
+
+        "officer": {
+            "id": officer_id,
+            "user_id": str(
+                user_result.inserted_id
+            ),
+            "name": name,
+            "email": email,
+            "department_id":
+                department_id,
+            "department_name":
+                department["name"],
+            "role": "officer"
+        }
+    }
 
 @app.get("/departments/{department_id}/officers")
 def get_department_officers(
@@ -577,11 +830,17 @@ def login_user(user: UserLogin):
         "access_token": access_token,
         "token_type": "bearer",
         "user": {
-            "id": str(existing_user["_id"]),
-            "name": existing_user["name"],
-            "email": existing_user["email"],
-            "role": existing_user["role"]
-        }
+    "id": str(existing_user["_id"]),
+    "name": existing_user["name"],
+    "email": existing_user["email"],
+    "role": existing_user["role"],
+    "officer_id":
+        existing_user.get("officer_id"),
+    "department_id":
+        existing_user.get(
+            "department_id"
+        )
+}
     }
 
 @app.get("/me")

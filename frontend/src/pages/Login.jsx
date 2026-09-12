@@ -48,8 +48,10 @@ function Login() {
         JSON.stringify(data.user)
       )
 
-      if (data.user.role === "admin") {
+     if (data.user.role === "admin") {
   navigate("/admin")
+} else if (data.user.role === "officer") {
+  navigate("/officer")
 } else {
   navigate("/my-reports")
 }

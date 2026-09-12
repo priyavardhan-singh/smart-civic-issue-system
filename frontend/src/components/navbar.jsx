@@ -26,6 +26,8 @@ function Navbar() {
     } else {
       setUser(null)
     }
+
+    setIsMenuOpen(false)
   }, [location])
 
   const handleLogout = () => {
@@ -46,6 +48,36 @@ function Navbar() {
   const isAdmin =
     user?.role === 'admin'
 
+  const isOfficer =
+    user?.role === 'officer'
+  
+  const isCitizen =
+  user?.role === 'citizen'
+
+  const getHomePath = () => {
+    if (isAdmin) {
+      return '/admin'
+    }
+
+    if (isOfficer) {
+      return '/officer'
+    }
+
+    return '/'
+  }
+
+  const getLogoText = () => {
+    if (isAdmin) {
+      return 'Smart Civic Admin'
+    }
+
+    if (isOfficer) {
+      return 'Smart Civic Officer'
+    }
+
+    return 'Smart Civic'
+  }
+
   return (
     <nav className="border-b bg-white px-6 py-4">
 
@@ -54,12 +86,10 @@ function Navbar() {
         {/* LOGO */}
 
         <Link
-          to={isAdmin ? '/admin' : '/'}
+          to={getHomePath()}
           className="text-2xl font-bold text-blue-700"
         >
-          {isAdmin
-            ? 'Smart Civic Admin'
-            : 'Smart Civic'}
+          {getLogoText()}
         </Link>
 
         {/* DESKTOP NAVIGATION */}
@@ -69,59 +99,75 @@ function Navbar() {
           {isAdmin ? (
             <>
               <Link
-  to="/admin"
-  className="text-gray-700 hover:text-blue-700"
->
-  Dashboard
-</Link>
+                to="/admin"
+                className="text-gray-700 hover:text-blue-700"
+              >
+                Dashboard
+              </Link>
 
-<Link
-  to="/admin/manage"
-  className="text-gray-700 hover:text-blue-700"
->
-  Departments & Officers
-</Link>
+              <Link
+                to="/admin/manage"
+                className="text-gray-700 hover:text-blue-700"
+              >
+                Departments & Officers
+              </Link>
 
-<Link
-  to="/profile"
-  className="text-gray-700 hover:text-blue-700"
->
-  Profile
-</Link>
+              <Link
+                to="/profile"
+                className="text-gray-700 hover:text-blue-700"
+              >
+                Profile
+              </Link>
             </>
-          ) : (
+          ) : isOfficer ? (
             <>
               <Link
-                to="/"
+                to="/officer"
                 className="text-gray-700 hover:text-blue-700"
               >
-                Home
+                Dashboard
               </Link>
 
               <Link
-                to="/report"
+                to="/profile"
                 className="text-gray-700 hover:text-blue-700"
               >
-                Report Issue
+                Profile
               </Link>
-
-              <Link
-                to="/my-reports"
-                className="text-gray-700 hover:text-blue-700"
-              >
-                My Reports
-              </Link>
-
-              {user && (
-                <Link
-                  to="/profile"
-                  className="text-gray-700 hover:text-blue-700"
-                >
-                  Profile
-                </Link>
-              )}
             </>
-          )}
+          ) : isCitizen || !user ? (
+  <>
+    <Link
+      to="/"
+      className="text-gray-700 hover:text-blue-700"
+    >
+      Home
+    </Link>
+
+    <Link
+      to="/report"
+      className="text-gray-700 hover:text-blue-700"
+    >
+      Report Issue
+    </Link>
+
+    <Link
+      to="/my-reports"
+      className="text-gray-700 hover:text-blue-700"
+    >
+      My Reports
+    </Link>
+
+    {user && (
+      <Link
+        to="/profile"
+        className="text-gray-700 hover:text-blue-700"
+      >
+        Profile
+      </Link>
+    )}
+  </>
+) : null}
 
         </div>
 
@@ -197,6 +243,16 @@ function Navbar() {
               </Link>
 
               <Link
+                to="/admin/manage"
+                onClick={() =>
+                  setIsMenuOpen(false)
+                }
+                className="text-gray-700 hover:text-blue-700"
+              >
+                Departments & Officers
+              </Link>
+
+              <Link
                 to="/profile"
                 onClick={() =>
                   setIsMenuOpen(false)
@@ -206,52 +262,73 @@ function Navbar() {
                 Profile
               </Link>
             </>
-          ) : (
+          ) : isOfficer ? (
             <>
               <Link
-                to="/"
+                to="/officer"
                 onClick={() =>
                   setIsMenuOpen(false)
                 }
                 className="text-gray-700 hover:text-blue-700"
               >
-                Home
+                Dashboard
               </Link>
 
               <Link
-                to="/report"
+                to="/profile"
                 onClick={() =>
                   setIsMenuOpen(false)
                 }
                 className="text-gray-700 hover:text-blue-700"
               >
-                Report Issue
+                Profile
               </Link>
-
-              <Link
-                to="/my-reports"
-                onClick={() =>
-                  setIsMenuOpen(false)
-                }
-                className="text-gray-700 hover:text-blue-700"
-              >
-                My Reports
-              </Link>
-
-              {user && (
-                <Link
-                  to="/profile"
-                  onClick={() =>
-                    setIsMenuOpen(false)
-                  }
-                  className="text-gray-700 hover:text-blue-700"
-                >
-                  Profile
-                </Link>
-              )}
             </>
-          )}
+          ) : isCitizen || !user ? (
+  <>
+    <Link
+      to="/"
+      onClick={() =>
+        setIsMenuOpen(false)
+      }
+      className="text-gray-700 hover:text-blue-700"
+    >
+      Home
+    </Link>
 
+    <Link
+      to="/report"
+      onClick={() =>
+        setIsMenuOpen(false)
+      }
+      className="text-gray-700 hover:text-blue-700"
+    >
+      Report Issue
+    </Link>
+
+    <Link
+      to="/my-reports"
+      onClick={() =>
+        setIsMenuOpen(false)
+      }
+      className="text-gray-700 hover:text-blue-700"
+    >
+      My Reports
+    </Link>
+
+    {user && (
+      <Link
+        to="/profile"
+        onClick={() =>
+          setIsMenuOpen(false)
+        }
+        className="text-gray-700 hover:text-blue-700"
+      >
+        Profile
+      </Link>
+    )}
+  </>
+) : null} 
           {user ? (
             <>
               <span className="font-medium text-gray-700">
