@@ -584,6 +584,87 @@ const assignReport = async () => {
               </div>
             )}
 
+          {report.status === "resolved" && (
+  <div className="mt-8 rounded-xl border border-green-200 bg-green-50 p-5">
+
+    <h3 className="text-xl font-bold text-green-900">
+      Resolution Proof
+    </h3>
+
+    <p className="mt-1 text-sm text-green-800">
+      Evidence submitted by the assigned officer
+      after completing the civic issue.
+    </p>
+
+    {report.resolution_photo_url && (
+      <div className="mt-5">
+
+        <p className="text-sm font-semibold text-gray-700">
+          Resolution Photo
+        </p>
+
+        <div className="mt-2 flex items-center justify-center rounded-lg border bg-white p-3">
+
+          <img
+            src={`${API_URL}${report.resolution_photo_url}`}
+            alt="Officer resolution proof"
+            className="max-h-[500px] w-full object-contain"
+          />
+
+        </div>
+
+      </div>
+    )}
+
+    {report.resolution_remarks && (
+      <div className="mt-5">
+
+        <p className="text-sm font-semibold text-gray-700">
+          Officer Remarks
+        </p>
+
+        <p className="mt-2 whitespace-pre-wrap leading-7 text-gray-800">
+          {report.resolution_remarks}
+        </p>
+
+      </div>
+    )}
+
+    {report.resolved_at && (
+      <div className="mt-5">
+
+        <p className="text-sm font-semibold text-gray-700">
+          Resolved On
+        </p>
+
+        <p className="mt-1 text-gray-800">
+          {new Date(
+            report.resolved_at
+          ).toLocaleString()}
+        </p>
+
+      </div>
+    )}
+
+    {report.work_started_at && (
+      <div className="mt-5">
+
+        <p className="text-sm font-semibold text-gray-700">
+          Work Started On
+        </p>
+
+        <p className="mt-1 text-gray-800">
+          {new Date(
+            report.work_started_at
+          ).toLocaleString()}
+        </p>
+
+      </div>
+    )}
+
+  </div>
+)}
+
             <div className="mt-8 border-t pt-6">
 
   <h3 className="text-xl font-bold text-gray-900">
@@ -697,44 +778,52 @@ const assignReport = async () => {
 
 </div>
 
-            <div className="mt-8 border-t pt-6">
+           <div className="mt-8 border-t pt-6">
 
-              <label className="block text-sm font-semibold text-gray-700">
-                Update Report Status
-              </label>
+  <label className="block text-sm font-semibold text-gray-700">
+    Update Report Status
+  </label>
 
-              <select
-                value={report.status}
-                disabled={isUpdating}
-                onChange={(event) =>
-                  updateStatus(
-                    event.target.value
-                  )
-                }
-                className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none sm:max-w-md"
-              >
-                <option value="reported">
-                  Reported
-                </option>
+  {report.status === "resolved" ? (
+    <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-4">
+      <p className="font-semibold text-green-800">
+        This report has been resolved with officer proof.
+      </p>
 
-                <option value="assigned">
-                  Assigned
-                </option>
+      <p className="mt-1 text-sm text-green-700">
+        Resolved reports cannot be manually changed by the admin.
+      </p>
+    </div>
+  ) : (
+    <>
+      <select
+        value={report.status}
+        disabled={isUpdating}
+        onChange={(event) =>
+          updateStatus(event.target.value)
+        }
+        className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 focus:border-blue-600 focus:outline-none sm:max-w-md"
+      >
+        <option value="reported">
+          Reported
+        </option>
 
-                <option value="in_progress">
-                  In Progress
-                </option>
+        <option value="assigned">
+          Assigned
+        </option>
 
-                <option value="resolved">
-                  Resolved
-                </option>
-              </select>
+        <option value="in_progress">
+          In Progress
+        </option>
+      </select>
 
-              {isUpdating && (
-                <p className="mt-2 text-sm text-gray-500">
-                  Updating status...
-                </p>
-              )}
+      {isUpdating && (
+        <p className="mt-2 text-sm text-gray-500">
+          Updating status...
+        </p>
+      )}
+    </>
+  )}
 
             </div>
 

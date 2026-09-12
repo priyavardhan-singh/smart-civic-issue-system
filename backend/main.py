@@ -288,11 +288,19 @@ def update_report_status(
         )
 
     allowed_statuses = [
-        "reported",
-        "assigned",
-        "in_progress",
-        "resolved"
-    ]
+    "reported",
+    "assigned",
+    "in_progress"
+]
+
+    if status_update.status == "resolved":
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            "Reports can only be resolved by the assigned "
+            "officer with resolution proof"
+        )
+    )
 
     if status_update.status not in allowed_statuses:
         raise HTTPException(
@@ -496,53 +504,23 @@ def update_officer_report_status(
             detail="Assigned report not found"
         )
 
-    current_status = report.get(
-        "status"
-    )
-
-    allowed_transitions = {
-        "assigned": "in_progress",
-        "in_progress": "resolved"
-    }
-
-    next_status = allowed_transitions.get(
-        current_status
-    )
-
-    if not next_status:
+    # Officer can only start work through this endpoint.
+    # Resolving requires proof through /resolve.
+    if report.get("status") != "assigned":
         raise HTTPException(
             status_code=400,
-            detail="This report cannot be updated further"
+            detail="Only assigned reports can be started"
         )
 
-    if status_update.status != next_status:
+    if status_update.status != "in_progress":
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"Status must change from "
-                f"{current_status} to "
-                f"{next_status}"
-            )
+            detail="Status must change from assigned to in_progress"
         )
 
     now = datetime.now(
         timezone.utc
     )
-
-    update_data = {
-        "status": status_update.status,
-        "updated_at": now
-    }
-
-    if status_update.status == "in_progress":
-        update_data[
-            "work_started_at"
-        ] = now
-
-    if status_update.status == "resolved":
-        update_data[
-            "resolved_at"
-        ] = now
 
     db.reports.update_one(
         {
@@ -551,15 +529,158 @@ def update_officer_report_status(
                 officer_id
         },
         {
-            "$set": update_data
+            "$set": {
+                "status": "in_progress",
+                "work_started_at": now,
+                "updated_at": now
+            }
         }
     )
 
     return {
         "message":
-            "Report status updated successfully",
+            "Work started successfully",
         "status":
-            status_update.status
+            "in_progress"
+    }
+
+@app.post("/officer/reports/{report_id}/resolve")
+def resolve_officer_report(
+    report_id: str,
+    remarks: str = Form(...),
+    resolution_photo: UploadFile = File(...),
+    current_officer = Security(get_current_officer)
+):
+    if not ObjectId.is_valid(report_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid report ID"
+        )
+
+    officer_id = current_officer.get(
+        "officer_id"
+    )
+
+    if not officer_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Officer account is not linked correctly"
+        )
+
+    report = db.reports.find_one({
+        "_id": ObjectId(report_id),
+        "assigned_officer_id": officer_id
+    })
+
+    if not report:
+        raise HTTPException(
+            status_code=404,
+            detail="Assigned report not found"
+        )
+
+    if report.get("status") != "in_progress":
+        raise HTTPException(
+            status_code=400,
+            detail="Report must be in progress before it can be resolved"
+        )
+
+    clean_remarks = remarks.strip()
+
+    if not clean_remarks:
+        raise HTTPException(
+            status_code=400,
+            detail="Resolution remarks cannot be empty"
+        )
+
+    if (
+        not resolution_photo.content_type
+        or not resolution_photo.content_type.startswith(
+            "image/"
+        )
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Resolution proof must be an image"
+        )
+
+    file_extension = Path(
+        resolution_photo.filename or ""
+    ).suffix.lower()
+
+    allowed_extensions = {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp"
+    }
+
+    if file_extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported resolution image format"
+        )
+
+    unique_filename = (
+        f"resolution_{uuid4()}"
+        f"{file_extension}"
+    )
+
+    file_path = (
+        UPLOAD_DIR /
+        unique_filename
+    )
+
+    with file_path.open(
+        "wb"
+    ) as buffer:
+        shutil.copyfileobj(
+            resolution_photo.file,
+            buffer
+        )
+
+    now = datetime.now(
+        timezone.utc
+    )
+
+    resolution_photo_url = (
+        f"/uploads/{unique_filename}"
+    )
+
+    db.reports.update_one(
+        {
+            "_id": ObjectId(report_id),
+            "assigned_officer_id":
+                officer_id
+        },
+        {
+            "$set": {
+                "status": "resolved",
+
+                "resolution_remarks":
+                    clean_remarks,
+
+                "resolution_photo_url":
+                    resolution_photo_url,
+
+                "resolved_at": now,
+
+                "updated_at": now
+            }
+        }
+    )
+
+    return {
+        "message":
+            "Report resolved successfully",
+
+        "status":
+            "resolved",
+
+        "resolution_remarks":
+            clean_remarks,
+
+        "resolution_photo_url":
+            resolution_photo_url
     }
 
 @app.post("/departments")

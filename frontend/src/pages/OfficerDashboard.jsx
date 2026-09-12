@@ -7,8 +7,19 @@ function OfficerDashboard() {
   const [reports, setReports] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
+
   const [updatingReportId, setUpdatingReportId] =
     useState(null)
+
+  const [resolvingReportId, setResolvingReportId] =
+    useState(null)
+
+  const [resolutionRemarks, setResolutionRemarks] =
+    useState({})
+
+  const [resolutionPhotos, setResolutionPhotos] =
+    useState({})
 
   const navigate = useNavigate()
 
@@ -39,7 +50,9 @@ function OfficerDashboard() {
 
     try {
       const token =
-        localStorage.getItem("access_token")
+        localStorage.getItem(
+          "access_token"
+        )
 
       const response = await fetch(
         `${API_URL}/officer/reports`,
@@ -58,7 +71,10 @@ function OfficerDashboard() {
         localStorage.removeItem(
           "access_token"
         )
-        localStorage.removeItem("user")
+
+        localStorage.removeItem(
+          "user"
+        )
 
         navigate("/login")
         return
@@ -89,11 +105,11 @@ function OfficerDashboard() {
     }
   }
 
-  const updateStatus = async (
-    reportId,
-    newStatus
+  const startWork = async (
+    reportId
   ) => {
     setErrorMessage("")
+    setSuccessMessage("")
     setUpdatingReportId(reportId)
 
     try {
@@ -116,7 +132,7 @@ function OfficerDashboard() {
           },
 
           body: JSON.stringify({
-            status: newStatus,
+            status: "in_progress",
           }),
         }
       )
@@ -127,41 +143,159 @@ function OfficerDashboard() {
       if (!response.ok) {
         throw new Error(
           data.detail ||
-            "Unable to update report status."
+            "Unable to start work."
         )
       }
+
+      setSuccessMessage(
+        "Work started successfully."
+      )
 
       await loadReports()
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Unable to update report status."
+          : "Unable to start work."
       )
     } finally {
       setUpdatingReportId(null)
     }
   }
 
-  const getNextAction = (status) => {
-    if (status === "assigned") {
-      return {
-        label: "Start Work",
-        nextStatus: "in_progress",
-      }
+  const handlePhotoChange = (
+    reportId,
+    event
+  ) => {
+    const file =
+      event.target.files?.[0]
+
+    if (!file) {
+      return
     }
 
-    if (status === "in_progress") {
-      return {
-        label: "Mark as Resolved",
-        nextStatus: "resolved",
-      }
-    }
-
-    return null
+    setResolutionPhotos(
+      (previous) => ({
+        ...previous,
+        [reportId]: file,
+      })
+    )
   }
 
-  const formatStatus = (status) => {
+  const resolveReport = async (
+    reportId
+  ) => {
+    setErrorMessage("")
+    setSuccessMessage("")
+
+    const remarks =
+      resolutionRemarks[reportId] || ""
+
+    const photo =
+      resolutionPhotos[reportId]
+
+    if (!remarks.trim()) {
+      setErrorMessage(
+        "Please enter resolution remarks."
+      )
+      return
+    }
+
+    if (!photo) {
+      setErrorMessage(
+        "Please upload a resolution photo."
+      )
+      return
+    }
+
+    setResolvingReportId(reportId)
+
+    try {
+      const token =
+        localStorage.getItem(
+          "access_token"
+        )
+
+      const formData =
+        new FormData()
+
+      formData.append(
+        "remarks",
+        remarks.trim()
+      )
+
+      formData.append(
+        "resolution_photo",
+        photo
+      )
+
+      const response = await fetch(
+        `${API_URL}/officer/reports/${reportId}/resolve`,
+        {
+          method: "POST",
+
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+          },
+
+          body: formData,
+        }
+      )
+
+      const data =
+        await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            "Unable to resolve report."
+        )
+      }
+
+      setSuccessMessage(
+        "Report resolved successfully."
+      )
+
+      setResolutionRemarks(
+        (previous) => {
+          const updated = {
+            ...previous,
+          }
+
+          delete updated[reportId]
+
+          return updated
+        }
+      )
+
+      setResolutionPhotos(
+        (previous) => {
+          const updated = {
+            ...previous,
+          }
+
+          delete updated[reportId]
+
+          return updated
+        }
+      )
+
+      await loadReports()
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to resolve report."
+      )
+    } finally {
+      setResolvingReportId(null)
+    }
+  }
+
+  const formatStatus = (
+    status
+  ) => {
     if (status === "in_progress") {
       return "In Progress"
     }
@@ -177,20 +311,36 @@ function OfficerDashboard() {
     return status
   }
 
-  const getStatusClass = (status) => {
+  const getStatusClass = (
+    status
+  ) => {
     if (status === "assigned") {
-      return "bg-yellow-100 text-yellow-800"
+      return (
+        "bg-yellow-100 " +
+        "text-yellow-800"
+      )
     }
 
-    if (status === "in_progress") {
-      return "bg-blue-100 text-blue-800"
+    if (
+      status === "in_progress"
+    ) {
+      return (
+        "bg-blue-100 " +
+        "text-blue-800"
+      )
     }
 
     if (status === "resolved") {
-      return "bg-green-100 text-green-800"
+      return (
+        "bg-green-100 " +
+        "text-green-800"
+      )
     }
 
-    return "bg-gray-100 text-gray-800"
+    return (
+      "bg-gray-100 " +
+      "text-gray-800"
+    )
   }
 
   if (isLoading) {
@@ -226,6 +376,12 @@ function OfficerDashboard() {
           </div>
         )}
 
+        {successMessage && (
+          <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-green-700">
+            {successMessage}
+          </div>
+        )}
+
         <div className="mt-8">
 
           {reports.length === 0 ? (
@@ -242,11 +398,8 @@ function OfficerDashboard() {
           ) : (
             <div className="grid gap-6 md:grid-cols-2">
 
-              {reports.map((report) => {
-                const action =
-                  getNextAction(report.status)
-
-                return (
+              {reports.map(
+                (report) => (
                   <article
                     key={report._id}
                     className="overflow-hidden rounded-xl border bg-white shadow-sm"
@@ -334,23 +487,12 @@ function OfficerDashboard() {
                           </p>
                         </div>
 
-                        {report.created_at && (
-                          <div>
-                            <p className="text-sm font-semibold text-gray-700">
-                              Reported On
-                            </p>
-
-                            <p className="mt-1 text-gray-600">
-                              {new Date(
-                                report.created_at
-                              ).toLocaleString()}
-                            </p>
-                          </div>
-                        )}
-
                       </div>
 
-                      {action && (
+                      {/* ASSIGNED */}
+
+                      {report.status ===
+                        "assigned" && (
                         <button
                           type="button"
                           disabled={
@@ -358,24 +500,169 @@ function OfficerDashboard() {
                             report._id
                           }
                           onClick={() =>
-                            updateStatus(
-                              report._id,
-                              action.nextStatus
+                            startWork(
+                              report._id
                             )
                           }
-                          className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-3 font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
                         >
                           {updatingReportId ===
                           report._id
-                            ? "Updating..."
-                            : action.label}
+                            ? "Starting..."
+                            : "Start Work"}
                         </button>
                       )}
 
+                      {/* IN PROGRESS */}
+
+                      {report.status ===
+                        "in_progress" && (
+                        <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
+
+                          <h3 className="font-semibold text-gray-900">
+                            Complete Resolution
+                          </h3>
+
+                          <p className="mt-1 text-sm text-gray-600">
+                            Add work remarks and a
+                            photo showing the resolved
+                            issue.
+                          </p>
+
+                          <div className="mt-4">
+                            <label className="block text-sm font-semibold text-gray-700">
+                              Resolution Remarks
+                            </label>
+
+                            <textarea
+                              rows="4"
+                              value={
+                                resolutionRemarks[
+                                  report._id
+                                ] || ""
+                              }
+                              onChange={(
+                                event
+                              ) =>
+                                setResolutionRemarks(
+                                  (
+                                    previous
+                                  ) => ({
+                                    ...previous,
+
+                                    [report._id]:
+                                      event.target
+                                        .value,
+                                  })
+                                )
+                              }
+                              placeholder="Example: Pothole filled and damaged road surface repaired."
+                              className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-600"
+                            />
+                          </div>
+
+                          <div className="mt-4">
+                            <label className="block text-sm font-semibold text-gray-700">
+                              Resolution Photo
+                            </label>
+
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              onChange={(
+                                event
+                              ) =>
+                                handlePhotoChange(
+                                  report._id,
+                                  event
+                                )
+                              }
+                              className="mt-2 block w-full text-sm text-gray-700"
+                            />
+
+                            {resolutionPhotos[
+                              report._id
+                            ] && (
+                              <p className="mt-2 text-xs text-gray-600">
+                                Selected:{" "}
+                                {
+                                  resolutionPhotos[
+                                    report._id
+                                  ].name
+                                }
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={
+                              resolvingReportId ===
+                              report._id
+                            }
+                            onClick={() =>
+                              resolveReport(
+                                report._id
+                              )
+                            }
+                            className="mt-5 w-full rounded-lg bg-green-700 px-4 py-3 font-semibold text-white hover:bg-green-800 disabled:opacity-60"
+                          >
+                            {resolvingReportId ===
+                            report._id
+                              ? "Submitting..."
+                              : "Submit Resolution Proof"}
+                          </button>
+
+                        </div>
+                      )}
+
+                      {/* RESOLVED */}
+
                       {report.status ===
                         "resolved" && (
-                        <div className="mt-6 rounded-lg bg-green-50 p-4 text-center font-semibold text-green-700">
-                          Issue Resolved
+                        <div className="mt-6">
+
+                          <div className="rounded-lg bg-green-50 p-4 text-center font-semibold text-green-700">
+                            Issue Resolved
+                          </div>
+
+                          {report.resolution_photo_url && (
+                            <div className="mt-4">
+                              <p className="text-sm font-semibold text-gray-700">
+                                Resolution Proof
+                              </p>
+
+                              <img
+                                src={`${API_URL}${report.resolution_photo_url}`}
+                                alt="Resolution proof"
+                                className="mt-2 max-h-72 w-full rounded-lg border bg-gray-50 object-contain"
+                              />
+                            </div>
+                          )}
+
+                          {report.resolution_remarks && (
+                            <div className="mt-4">
+                              <p className="text-sm font-semibold text-gray-700">
+                                Resolution Remarks
+                              </p>
+
+                              <p className="mt-1 text-gray-600">
+                                {
+                                  report.resolution_remarks
+                                }
+                              </p>
+                            </div>
+                          )}
+
+                          {report.resolved_at && (
+                            <p className="mt-4 text-xs text-gray-500">
+                              Resolved on:{" "}
+                              {new Date(
+                                report.resolved_at
+                              ).toLocaleString()}
+                            </p>
+                          )}
+
                         </div>
                       )}
 
@@ -383,7 +670,7 @@ function OfficerDashboard() {
 
                   </article>
                 )
-              })}
+              )}
 
             </div>
           )}

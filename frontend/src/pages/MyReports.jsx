@@ -140,7 +140,7 @@ function MyReports() {
                   <img
                     src={`http://127.0.0.1:8000${report.photo_url}`}
                     alt="Reported civic issue"
-                    className="h-56 w-full object-cover"
+                    className="h-56 w-full object-contain bg-gray-100"
                   />
                 )}
 
@@ -187,6 +187,53 @@ function MyReports() {
                         ).toLocaleString()}
                       </p>
                     )}
+
+                    {report.status === "resolved" && (
+  <div className="mt-5 rounded-lg border border-green-200 bg-green-50 p-4">
+
+    <h3 className="font-semibold text-green-800">
+      Resolution Details
+    </h3>
+
+    {report.resolution_photo_url && (
+      <div className="mt-4">
+        <p className="text-sm font-medium text-gray-700">
+          Resolution Proof:
+        </p>
+
+        <img
+          src={`http://127.0.0.1:8000${report.resolution_photo_url}`}
+          alt="Resolution proof"
+          className="mt-2 max-h-72 w-full rounded-lg border bg-white object-contain"
+        />
+      </div>
+    )}
+
+    {report.resolution_remarks && (
+      <div className="mt-4">
+        <p className="text-sm font-medium text-gray-700">
+          Officer Remarks:
+        </p>
+
+        <p className="mt-1 text-gray-700">
+          {report.resolution_remarks}
+        </p>
+      </div>
+    )}
+
+    {report.resolved_at && (
+      <p className="mt-4 text-sm text-gray-600">
+        <span className="font-medium text-gray-700">
+          Resolved:
+        </span>{" "}
+        {new Date(
+          report.resolved_at
+        ).toLocaleString()}
+      </p>
+    )}
+
+  </div>
+)}
 
                   </div>
                 </div>
