@@ -7,8 +7,10 @@ function AdminManagement() {
   const [departments, setDepartments] =
     useState([])
 
-  const [selectedDepartmentId, setSelectedDepartmentId] =
-    useState("")
+  const [
+    selectedDepartmentId,
+    setSelectedDepartmentId,
+  ] = useState("")
 
   const [officers, setOfficers] =
     useState([])
@@ -28,11 +30,20 @@ function AdminManagement() {
   const [isLoading, setIsLoading] =
     useState(true)
 
-  const [isAddingDepartment, setIsAddingDepartment] =
-    useState(false)
+  const [
+    isAddingDepartment,
+    setIsAddingDepartment,
+  ] = useState(false)
 
-  const [isAddingOfficer, setIsAddingOfficer] =
-    useState(false)
+  const [
+    isAddingOfficer,
+    setIsAddingOfficer,
+  ] = useState(false)
+
+  const [
+    deletingOfficerId,
+    setDeletingOfficerId,
+  ] = useState(null)
 
   const [errorMessage, setErrorMessage] =
     useState("")
@@ -44,11 +55,14 @@ function AdminManagement() {
 
   useEffect(() => {
     const user = JSON.parse(
-      localStorage.getItem("user") || "null"
+      localStorage.getItem("user") ||
+        "null"
     )
 
     const token =
-      localStorage.getItem("access_token")
+      localStorage.getItem(
+        "access_token"
+      )
 
     if (!token || !user) {
       navigate("/login")
@@ -69,23 +83,47 @@ function AdminManagement() {
       return
     }
 
-    loadOfficers(selectedDepartmentId)
+    loadOfficers(
+      selectedDepartmentId
+    )
   }, [selectedDepartmentId])
+
+  const getToken = () =>
+    localStorage.getItem(
+      "access_token"
+    )
+
+  const handleAuthError = (
+    response
+  ) => {
+    if (response.status === 401) {
+      localStorage.removeItem(
+        "access_token"
+      )
+      localStorage.removeItem("user")
+      navigate("/login")
+      return true
+    }
+
+    if (response.status === 403) {
+      navigate("/")
+      return true
+    }
+
+    return false
+  }
 
   const loadDepartments = async () => {
     setIsLoading(true)
     setErrorMessage("")
 
     try {
-      const token =
-        localStorage.getItem("access_token")
-
       const response = await fetch(
         `${API_URL}/departments`,
         {
           headers: {
             Authorization:
-              `Bearer ${token}`,
+              `Bearer ${getToken()}`,
           },
         }
       )
@@ -93,19 +131,7 @@ function AdminManagement() {
       const data =
         await response.json()
 
-      if (response.status === 401) {
-        localStorage.removeItem(
-          "access_token"
-        )
-
-        localStorage.removeItem("user")
-
-        navigate("/login")
-        return
-      }
-
-      if (response.status === 403) {
-        navigate("/")
+      if (handleAuthError(response)) {
         return
       }
 
@@ -134,23 +160,22 @@ function AdminManagement() {
     setErrorMessage("")
 
     try {
-      const token =
-        localStorage.getItem(
-          "access_token"
-        )
-
       const response = await fetch(
         `${API_URL}/departments/${departmentId}/officers`,
         {
           headers: {
             Authorization:
-              `Bearer ${token}`,
+              `Bearer ${getToken()}`,
           },
         }
       )
 
       const data =
         await response.json()
+
+      if (handleAuthError(response)) {
+        return
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -189,11 +214,6 @@ function AdminManagement() {
     setIsAddingDepartment(true)
 
     try {
-      const token =
-        localStorage.getItem(
-          "access_token"
-        )
-
       const response = await fetch(
         `${API_URL}/departments`,
         {
@@ -204,17 +224,22 @@ function AdminManagement() {
               "application/json",
 
             Authorization:
-              `Bearer ${token}`,
+              `Bearer ${getToken()}`,
           },
 
           body: JSON.stringify({
-            name: departmentName.trim(),
+            name:
+              departmentName.trim(),
           }),
         }
       )
 
       const data =
         await response.json()
+
+      if (handleAuthError(response)) {
+        return
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -270,14 +295,9 @@ function AdminManagement() {
       return
     }
 
-    if (!officerPassword) {
-      setErrorMessage(
-        "Please enter officer password."
-      )
-      return
-    }
-
-    if (officerPassword.length < 6) {
+    if (
+      officerPassword.length < 6
+    ) {
       setErrorMessage(
         "Officer password must be at least 6 characters."
       )
@@ -287,11 +307,6 @@ function AdminManagement() {
     setIsAddingOfficer(true)
 
     try {
-      const token =
-        localStorage.getItem(
-          "access_token"
-        )
-
       const response = await fetch(
         `${API_URL}/officers`,
         {
@@ -302,11 +317,12 @@ function AdminManagement() {
               "application/json",
 
             Authorization:
-              `Bearer ${token}`,
+              `Bearer ${getToken()}`,
           },
 
           body: JSON.stringify({
-            name: officerName.trim(),
+            name:
+              officerName.trim(),
 
             email:
               officerEmail
@@ -325,6 +341,10 @@ function AdminManagement() {
       const data =
         await response.json()
 
+      if (handleAuthError(response)) {
+        return
+      }
+
       if (!response.ok) {
         throw new Error(
           data.detail ||
@@ -337,7 +357,7 @@ function AdminManagement() {
       setOfficerPassword("")
 
       setSuccessMessage(
-        "Officer account created successfully. The officer can now log in."
+        "Officer account created successfully."
       )
 
       await loadOfficers(
@@ -351,6 +371,71 @@ function AdminManagement() {
       )
     } finally {
       setIsAddingOfficer(false)
+    }
+  }
+
+  const handleDeleteOfficer = async (
+    officer
+  ) => {
+    const confirmed =
+      window.confirm(
+        `Delete officer account for ${officer.name}?\n\n` +
+          "The officer will no longer be able to log in. " +
+          "Any active assigned reports will return to Reported status for reassignment."
+      )
+
+    if (!confirmed) {
+      return
+    }
+
+    setErrorMessage("")
+    setSuccessMessage("")
+    setDeletingOfficerId(
+      officer.id
+    )
+
+    try {
+      const response = await fetch(
+        `${API_URL}/officers/${officer.id}`,
+        {
+          method: "DELETE",
+
+          headers: {
+            Authorization:
+              `Bearer ${getToken()}`,
+          },
+        }
+      )
+
+      const data =
+        await response.json()
+
+      if (handleAuthError(response)) {
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            "Unable to delete officer."
+        )
+      }
+
+      setSuccessMessage(
+        "Officer account deleted successfully."
+      )
+
+      await loadOfficers(
+        selectedDepartmentId
+      )
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to delete officer."
+      )
+    } finally {
+      setDeletingOfficerId(null)
     }
   }
 
@@ -377,8 +462,8 @@ function AdminManagement() {
 
           <p className="mt-2 text-gray-600">
             Manage departments and officer
-            accounts used for assigning civic
-            reports.
+            login accounts used for assigning
+            civic reports.
           </p>
         </div>
 
@@ -405,8 +490,8 @@ function AdminManagement() {
             </h2>
 
             <p className="mt-1 text-sm text-gray-600">
-              Create departments responsible for
-              civic issues.
+              Create departments responsible
+              for civic issues.
             </p>
 
             <form
@@ -506,12 +591,14 @@ function AdminManagement() {
             </h2>
 
             <p className="mt-1 text-sm text-gray-600">
-              Create officer login accounts and
-              connect them with departments.
+              Create officer login accounts
+              and connect them with a department.
             </p>
 
             <form
-              onSubmit={handleAddOfficer}
+              onSubmit={
+                handleAddOfficer
+              }
               className="mt-6 space-y-4"
             >
 
@@ -586,7 +673,7 @@ function AdminManagement() {
                       event.target.value
                     )
                   }
-                  placeholder="officer@smartcivic.com"
+                  placeholder="officer@example.com"
                   className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-600 focus:outline-none"
                 />
               </div>
@@ -605,15 +692,8 @@ function AdminManagement() {
                     )
                   }
                   placeholder="Minimum 6 characters"
-                  minLength={6}
-                  autoComplete="new-password"
                   className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-3 focus:border-blue-600 focus:outline-none"
                 />
-
-                <p className="mt-1 text-xs text-gray-500">
-                  The officer will use this email
-                  and password to log in.
-                </p>
               </div>
 
               <button
@@ -624,7 +704,7 @@ function AdminManagement() {
                 className="w-full rounded-lg bg-green-700 px-4 py-3 font-semibold text-white hover:bg-green-800 disabled:opacity-60"
               >
                 {isAddingOfficer
-                  ? "Creating Account..."
+                  ? "Creating..."
                   : "Create Officer Account"}
               </button>
 
@@ -638,12 +718,13 @@ function AdminManagement() {
 
               {!selectedDepartmentId ? (
                 <p className="mt-3 text-sm text-gray-500">
-                  Select a department to view its
-                  officers.
+                  Select a department to view
+                  its officers.
                 </p>
               ) : officers.length === 0 ? (
                 <p className="mt-3 text-sm text-gray-500">
-                  No officers in this department.
+                  No active officer accounts
+                  in this department.
                 </p>
               ) : (
                 <div className="mt-3 space-y-3">
@@ -654,19 +735,48 @@ function AdminManagement() {
                         key={officer.id}
                         className="rounded-lg border border-gray-200 bg-gray-50 p-4"
                       >
-                        <p className="font-semibold text-gray-900">
-                          {officer.name}
-                        </p>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 
-                        <p className="mt-1 text-sm text-gray-600">
-                          {officer.email}
-                        </p>
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {
+                                officer.name
+                              }
+                            </p>
 
-                        <p className="mt-2 text-xs text-gray-500">
-                          {
-                            officer.department_name
-                          }
-                        </p>
+                            <p className="mt-1 text-sm text-gray-600">
+                              {
+                                officer.email
+                              }
+                            </p>
+
+                            <p className="mt-2 text-xs text-gray-500">
+                              {
+                                officer.department_name
+                              }
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDeleteOfficer(
+                                officer
+                              )
+                            }
+                            disabled={
+                              deletingOfficerId ===
+                              officer.id
+                            }
+                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                          >
+                            {deletingOfficerId ===
+                            officer.id
+                              ? "Deleting..."
+                              : "Delete Account"}
+                          </button>
+
+                        </div>
                       </div>
                     )
                   )}

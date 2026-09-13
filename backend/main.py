@@ -356,38 +356,50 @@ def create_report(
     )
 
     report_data = {
-        "user_id":
-            str(
-                current_user["_id"]
-            ),
+    "user_id": str(
+        current_user["_id"]
+    ),
 
-        "category":
-            category,
+    "category":
+        category,
 
-        "description":
-            description,
+    "description":
+        description,
 
-        "latitude":
-            latitude,
+    "latitude":
+        latitude,
 
-        "longitude":
-            longitude,
+    "longitude":
+        longitude,
 
-        "address":
-            address,
+    "address":
+        address,
 
-        "photo_url":
-            f"/uploads/{unique_filename}",
+    "photo_url":
+        f"/uploads/{unique_filename}",
 
-        "status":
-            "reported",
+    "status":
+        "reported",
 
-        "created_at":
-            now,
+    "activity_history": [
+        {
+            "type":
+                "reported",
 
-        "updated_at":
-            now,
-    }
+            "message":
+                "Report submitted successfully",
+
+            "created_at":
+                now,
+        }
+    ],
+
+    "created_at":
+        now,
+
+    "updated_at":
+        now,
+}
 
     result = (
         db.reports.insert_one(
@@ -627,50 +639,29 @@ def update_report_status(
 )
 def assign_report(
     report_id: str,
-    assignment:
-        ReportAssignment,
-    current_admin=Security(
-        get_current_admin
-    ),
+    assignment: ReportAssignment,
+    current_admin=Security(get_current_admin),
 ):
-    if not ObjectId.is_valid(
-        report_id
-    ):
+    if not ObjectId.is_valid(report_id):
         raise HTTPException(
             status_code=400,
             detail="Invalid report ID",
         )
 
-    if not ObjectId.is_valid(
-        assignment.department_id
-    ):
+    if not ObjectId.is_valid(assignment.department_id):
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Invalid department ID"
-            ),
+            detail="Invalid department ID",
         )
 
-    if not ObjectId.is_valid(
-        assignment.officer_id
-    ):
+    if not ObjectId.is_valid(assignment.officer_id):
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Invalid officer ID"
-            ),
+            detail="Invalid officer ID",
         )
 
-    # Check report before assignment.
-    report = (
-        db.reports.find_one(
-            {
-                "_id":
-                    ObjectId(
-                        report_id
-                    )
-            }
-        )
+    report = db.reports.find_one(
+        {"_id": ObjectId(report_id)}
     )
 
     if not report:
@@ -679,149 +670,117 @@ def assign_report(
             detail="Report not found",
         )
 
-    # Resolved reports must remain final.
-    if (
-        report.get("status")
-        == "resolved"
-    ):
+    if report.get("status") == "resolved":
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Resolved reports "
-                "cannot be reassigned"
-            ),
+            detail="Resolved reports cannot be reassigned",
         )
 
-    department = (
-        db.departments.find_one(
-            {
-                "_id":
-                    ObjectId(
-                        assignment
-                        .department_id
-                    )
-            }
-        )
+    department = db.departments.find_one(
+        {"_id": ObjectId(assignment.department_id)}
     )
 
     if not department:
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Department not found"
-            ),
+            detail="Department not found",
         )
 
-    officer = (
-        db.officers.find_one(
-            {
-                "_id":
-                    ObjectId(
-                        assignment
-                        .officer_id
-                    )
-            }
-        )
+    officer = db.officers.find_one(
+        {"_id": ObjectId(assignment.officer_id)}
     )
 
     if not officer:
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Officer not found"
-            ),
+            detail="Officer not found",
         )
 
+    if officer.get("department_id") != assignment.department_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Officer does not belong to selected department",
+        )
+
+    officer_user_id = officer.get("user_id")
+
     if (
-        officer[
-            "department_id"
-        ]
-        != assignment
-        .department_id
+        not officer_user_id
+        or not ObjectId.is_valid(officer_user_id)
     ):
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Officer does not belong "
-                "to selected department"
-            ),
+            detail="Selected officer does not have a valid login account",
         )
 
-    now = datetime.now(
-        timezone.utc
-    )
-
-    result = (
-        db.reports.update_one(
-            {
-                "_id":
-                    ObjectId(
-                        report_id
-                    )
-            },
-            {
-                "$set": {
-                    "department_id":
-                        assignment
-                        .department_id,
-
-                    "department":
-                        department[
-                            "name"
-                        ],
-
-                    "assigned_officer_id":
-                        assignment
-                        .officer_id,
-
-                    "assigned_to":
-                        officer[
-                            "name"
-                        ],
-
-                    "assigned_at":
-                        now,
-
-                    "status":
-                        "assigned",
-
-                    "updated_at":
-                        now,
-                }
-            },
-        )
+    linked_user = db.users.find_one(
+        {"_id": ObjectId(officer_user_id)}
     )
 
     if (
-        result.matched_count
-        == 0
+        not linked_user
+        or linked_user.get("role") != "officer"
+        or linked_user.get("officer_id") != str(officer["_id"])
     ):
+        raise HTTPException(
+            status_code=400,
+            detail="Selected officer account is not linked correctly",
+        )
+
+    # Keep officer collection synchronized with the officer login profile.
+    db.officers.update_one(
+        {"_id": officer["_id"]},
+        {
+            "$set": {
+                "name": linked_user["name"],
+                "email": linked_user["email"],
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
+    )
+
+    now = datetime.now(timezone.utc)
+
+    result = db.reports.update_one(
+        {"_id": ObjectId(report_id)},
+        {
+            "$set": {
+                "department_id": assignment.department_id,
+                "department": department["name"],
+                "assigned_officer_id": assignment.officer_id,
+                "assigned_to": linked_user["name"],
+                "assigned_at": now,
+                "status": "assigned",
+                "updated_at": now,
+            },
+            "$push": {
+                "activity_history": {
+                    "type": "assigned",
+                    "message": (
+                        f"Report assigned to {linked_user['name']} "
+                        f"from {department['name']}"
+                    ),
+                    "created_at": now,
+                }
+            },
+        },
+    )
+
+    if result.matched_count == 0:
         raise HTTPException(
             status_code=404,
             detail="Report not found",
         )
 
-    updated_report = (
-        db.reports.find_one(
-            {
-                "_id":
-                    ObjectId(
-                        report_id
-                    )
-            }
-        )
+    updated_report = db.reports.find_one(
+        {"_id": ObjectId(report_id)}
     )
 
-    updated_report["_id"] = str(
-        updated_report["_id"]
-    )
+    updated_report["_id"] = str(updated_report["_id"])
 
     return {
-        "message":
-            "Report assigned successfully",
-
-        "report":
-            updated_report,
+        "message": "Report assigned successfully",
+        "report": updated_report,
     }
 
 
@@ -969,28 +928,41 @@ def update_officer_report_status(
     )
 
     db.reports.update_one(
-        {
-            "_id":
-                ObjectId(
-                    report_id
-                ),
+    {
+        "_id":
+            ObjectId(
+                report_id
+            ),
 
-            "assigned_officer_id":
-                officer_id,
+        "assigned_officer_id":
+            officer_id,
+    },
+    {
+        "$set": {
+            "status":
+                "in_progress",
+
+            "work_started_at":
+                now,
+
+            "updated_at":
+                now,
         },
-        {
-            "$set": {
-                "status":
+
+        "$push": {
+            "activity_history": {
+                "type":
                     "in_progress",
 
-                "work_started_at":
-                    now,
+                "message":
+                    "Officer started working on the report",
 
-                "updated_at":
+                "created_at":
                     now,
             }
         },
-    )
+    },
+)
 
     return {
         "message":
@@ -1162,34 +1134,47 @@ def resolve_officer_report(
     )
 
     db.reports.update_one(
-        {
-            "_id":
-                ObjectId(
-                    report_id
-                ),
+    {
+        "_id":
+            ObjectId(
+                report_id
+            ),
 
-            "assigned_officer_id":
-                officer_id,
+        "assigned_officer_id":
+            officer_id,
+    },
+    {
+        "$set": {
+            "status":
+                "resolved",
+
+            "resolution_remarks":
+                clean_remarks,
+
+            "resolution_photo_url":
+                resolution_photo_url,
+
+            "resolved_at":
+                now,
+
+            "updated_at":
+                now,
         },
-        {
-            "$set": {
-                "status":
+
+        "$push": {
+            "activity_history": {
+                "type":
                     "resolved",
 
-                "resolution_remarks":
-                    clean_remarks,
+                "message":
+                    "Issue resolved with officer proof",
 
-                "resolution_photo_url":
-                    resolution_photo_url,
-
-                "resolved_at":
-                    now,
-
-                "updated_at":
+                "created_at":
                     now,
             }
         },
-    )
+    },
+)   
 
     return {
         "message":
@@ -1574,79 +1559,154 @@ def create_officer(
 )
 def get_department_officers(
     department_id: str,
-    current_admin=Security(
-        get_current_admin
-    ),
+    current_admin=Security(get_current_admin),
 ):
-    if not ObjectId.is_valid(
-        department_id
-    ):
+    if not ObjectId.is_valid(department_id):
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Invalid department ID"
-            ),
+            detail="Invalid department ID",
         )
 
-    department = (
-        db.departments.find_one(
-            {
-                "_id":
-                    ObjectId(
-                        department_id
-                    )
-            }
-        )
+    department = db.departments.find_one(
+        {"_id": ObjectId(department_id)}
     )
 
     if not department:
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Department not found"
-            ),
+            detail="Department not found",
         )
 
     officers = []
 
-    for officer in (
-        db.officers.find(
-            {
-                "department_id":
-                    department_id
-            }
+    for officer in db.officers.find(
+        {"department_id": department_id}
+    ).sort("name", 1):
+        user_id = officer.get("user_id")
+
+        if not user_id or not ObjectId.is_valid(user_id):
+            continue
+
+        linked_user = db.users.find_one(
+            {"_id": ObjectId(user_id)}
         )
-        .sort(
-            "name",
-            1,
-        )
-    ):
+
+        if not linked_user:
+            continue
+
+        if linked_user.get("role") != "officer":
+            continue
+
+        if linked_user.get("officer_id") != str(officer["_id"]):
+            continue
+
+        # Keep the officer document synchronized with the login account.
+        if (
+            officer.get("name") != linked_user.get("name")
+            or officer.get("email") != linked_user.get("email")
+        ):
+            db.officers.update_one(
+                {"_id": officer["_id"]},
+                {
+                    "$set": {
+                        "name": linked_user["name"],
+                        "email": linked_user["email"],
+                        "updated_at": datetime.now(timezone.utc),
+                    }
+                },
+            )
+
         officers.append(
             {
-                "id":
-                    str(
-                        officer["_id"]
-                    ),
-
-                "name":
-                    officer["name"],
-
-                "email":
-                    officer["email"],
-
-                "department_id":
-                    officer[
-                        "department_id"
-                    ],
-
-                "department_name":
-                    department[
-                        "name"
-                    ],
+                "id": str(officer["_id"]),
+                "user_id": str(linked_user["_id"]),
+                "name": linked_user["name"],
+                "email": linked_user["email"],
+                "department_id": officer["department_id"],
+                "department_name": department["name"],
             }
         )
 
     return officers
+
+
+@app.delete("/officers/{officer_id}")
+def delete_officer(
+    officer_id: str,
+    current_admin=Security(get_current_admin),
+):
+    if not ObjectId.is_valid(officer_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid officer ID",
+        )
+
+    officer = db.officers.find_one(
+        {"_id": ObjectId(officer_id)}
+    )
+
+    if not officer:
+        raise HTTPException(
+            status_code=404,
+            detail="Officer not found",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    # Any unresolved work assigned to this officer is returned for reassignment.
+    db.reports.update_many(
+        {
+            "assigned_officer_id": officer_id,
+            "status": {"$in": ["assigned", "in_progress"]},
+        },
+        {
+            "$set": {
+                "status": "reported",
+                "updated_at": now,
+            },
+            "$unset": {
+                "department_id": "",
+                "department": "",
+                "assigned_officer_id": "",
+                "assigned_to": "",
+                "assigned_at": "",
+                "work_started_at": "",
+            },
+            "$push": {
+                "activity_history": {
+                    "type": "officer_removed",
+                    "message": (
+                        "Assigned officer account was removed. "
+                        "Report returned for reassignment."
+                    ),
+                    "created_at": now,
+                }
+            },
+        },
+    )
+
+    user_id = officer.get("user_id")
+
+    if user_id and ObjectId.is_valid(user_id):
+        db.users.delete_one(
+            {"_id": ObjectId(user_id)}
+        )
+    else:
+        # Fallback for older linked data.
+        db.users.delete_many(
+            {
+                "role": "officer",
+                "officer_id": officer_id,
+            }
+        )
+
+    db.officers.delete_one(
+        {"_id": ObjectId(officer_id)}
+    )
+
+    return {
+        "message": "Officer account deleted successfully"
+    }
 
 
 # ---------------------------------------------------
@@ -1782,120 +1842,81 @@ def get_me(
 
 @app.patch("/me")
 def update_me(
-    profile_update:
-        UserProfileUpdate,
-    current_user=Security(
-        get_current_user
-    ),
+    profile_update: UserProfileUpdate,
+    current_user=Security(get_current_user),
 ):
-    name = (
-        profile_update
-        .name
-        .strip()
-    )
-
-    email = (
-        profile_update
-        .email
-        .lower()
-        .strip()
-    )
+    name = profile_update.name.strip()
+    email = profile_update.email.lower().strip()
 
     if not name:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Name cannot be empty"
-            ),
+            detail="Name cannot be empty",
         )
 
     if not email:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Email cannot be empty"
-            ),
+            detail="Email cannot be empty",
         )
 
-    existing_email_user = (
-        db.users.find_one(
-            {
-                "email":
-                    email,
-
-                "_id": {
-                    "$ne":
-                        current_user[
-                            "_id"
-                        ]
-                },
-            }
-        )
+    existing_email_user = db.users.find_one(
+        {
+            "email": email,
+            "_id": {
+                "$ne": current_user["_id"]
+            },
+        }
     )
 
     if existing_email_user:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Email already registered"
-            ),
+            detail="Email already registered",
         )
 
+    now = datetime.now(timezone.utc)
+
     db.users.update_one(
-        {
-            "_id":
-                current_user["_id"]
-        },
+        {"_id": current_user["_id"]},
         {
             "$set": {
-                "name":
-                    name,
-
-                "email":
-                    email,
-
-                "updated_at":
-                    datetime.now(
-                        timezone.utc
-                    ),
+                "name": name,
+                "email": email,
+                "updated_at": now,
             }
         },
     )
 
-    updated_user = (
-        db.users.find_one(
-            {
-                "_id":
-                    current_user["_id"]
-            }
-        )
+    # If this user is an officer, update the officer record too.
+    if current_user.get("role") == "officer":
+        officer_id = current_user.get("officer_id")
+
+        if officer_id and ObjectId.is_valid(officer_id):
+            db.officers.update_one(
+                {"_id": ObjectId(officer_id)},
+                {
+                    "$set": {
+                        "name": name,
+                        "email": email,
+                        "updated_at": now,
+                    }
+                },
+            )
+
+    updated_user = db.users.find_one(
+        {"_id": current_user["_id"]}
     )
 
     return {
-        "message":
-            "Profile updated successfully",
-
+        "message": "Profile updated successfully",
         "user": {
-            "id":
-                str(
-                    updated_user[
-                        "_id"
-                    ]
-                ),
-
-            "name":
-                updated_user[
-                    "name"
-                ],
-
-            "email":
-                updated_user[
-                    "email"
-                ],
-
-            "role":
-                updated_user[
-                    "role"
-                ],
+            "id": str(updated_user["_id"]),
+            "name": updated_user["name"],
+            "email": updated_user["email"],
+            "role": updated_user["role"],
+            "officer_id": updated_user.get("officer_id"),
+            "department_id": updated_user.get("department_id"),
         },
     }
+
