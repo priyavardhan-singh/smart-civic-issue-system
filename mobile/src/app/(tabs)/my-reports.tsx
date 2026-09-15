@@ -14,6 +14,14 @@ import {
 } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
+const API_URL = 'http://192.168.29.11:8000';
+
+type ActivityItem = {
+  type: string;
+  message?: string;
+  created_at?: string;
+};
+
 type Report = {
   _id: string;
   user_id: string;
@@ -25,6 +33,14 @@ type Report = {
   photo_url?: string;
   status: string;
   created_at?: string;
+  assigned_at?: string;
+  assigned_to?: string;
+  department?: string;
+  work_started_at?: string;
+  resolved_at?: string;
+  resolution_remarks?: string;
+  resolution_photo_url?: string;
+  activity_history?: ActivityItem[];
 };
 
 export default function MyReportsScreen() {
@@ -58,7 +74,7 @@ export default function MyReportsScreen() {
       setIsLoggedIn(true);
 
       const response = await fetch(
-        'http://192.168.29.11:8000/my-reports',
+        `${API_URL}/my-reports`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -127,11 +143,122 @@ export default function MyReportsScreen() {
   const formatStatus = (
     status: string
   ) => {
+    if (!status) {
+      return 'Unknown';
+    }
+
     return status
       .replaceAll('_', ' ')
       .replace(/\b\w/g, (letter) =>
         letter.toUpperCase()
       );
+  };
+
+  const formatDate = (
+    value?: string
+  ) => {
+    if (!value) {
+      return '';
+    }
+
+    return new Date(
+      value
+    ).toLocaleString();
+  };
+
+  const getActivityHistory = (
+    report: Report
+  ): ActivityItem[] => {
+    if (
+      Array.isArray(
+        report.activity_history
+      ) &&
+      report.activity_history.length > 0
+    ) {
+      return [
+        ...report.activity_history,
+      ].sort((a, b) => {
+        const first =
+          a.created_at
+            ? new Date(
+                a.created_at
+              ).getTime()
+            : 0;
+
+        const second =
+          b.created_at
+            ? new Date(
+                b.created_at
+              ).getTime()
+            : 0;
+
+        return first - second;
+      });
+    }
+
+    const fallback: ActivityItem[] = [];
+
+    if (report.created_at) {
+      fallback.push({
+        type: 'reported',
+        message:
+          'Report submitted successfully',
+        created_at:
+          report.created_at,
+      });
+    }
+
+    if (report.assigned_at) {
+      fallback.push({
+        type: 'assigned',
+        message:
+          report.assigned_to
+            ? `Report assigned to ${report.assigned_to}`
+            : 'Report assigned to an officer',
+        created_at:
+          report.assigned_at,
+      });
+    }
+
+    if (report.work_started_at) {
+      fallback.push({
+        type: 'in_progress',
+        message:
+          'Officer started working on the report',
+        created_at:
+          report.work_started_at,
+      });
+    }
+
+    if (report.resolved_at) {
+      fallback.push({
+        type: 'resolved',
+        message:
+          'Issue resolved with officer proof',
+        created_at:
+          report.resolved_at,
+      });
+    }
+
+    return fallback;
+  };
+
+  const getActivityCircleStyle = (
+    type: string
+  ) => {
+    if (type === 'resolved') {
+      return styles.activityCircleResolved;
+    }
+
+    if (type === 'in_progress') {
+      return styles.activityCircleProgress;
+    }
+
+    if (type === 'assigned') {
+      return styles.activityCircleAssigned;
+    }
+
+    return styles.activityCircleReported;
   };
 
   if (isLoading) {
@@ -281,94 +408,290 @@ export default function MyReportsScreen() {
               </View>
             )}
 
-          {reports.map((report) => (
-            <View
-              key={report._id}
-              style={styles.card}
-            >
-              {report.photo_url ? (
-                <Image
-                  source={{
-                    uri: `http://192.168.29.11:8000${report.photo_url}`,
-                  }}
-                  style={styles.image}
-                  resizeMode="cover"
-                />
-              ) : null}
+          {reports.map((report) => {
+            const activityHistory =
+              getActivityHistory(
+                report
+              );
 
+            return (
               <View
-                style={
-                  styles.cardContent
-                }
+                key={report._id}
+                style={styles.card}
               >
+                {report.photo_url ? (
+                  <Image
+                    source={{
+                      uri: `${API_URL}${report.photo_url}`,
+                    }}
+                    style={styles.image}
+                    resizeMode="contain"
+                  />
+                ) : null}
+
                 <View
                   style={
-                    styles.cardHeader
+                    styles.cardContent
                   }
                 >
-                  <Text
-                    style={
-                      styles.category
-                    }
-                  >
-                    {formatCategory(
-                      report.category
-                    )}
-                  </Text>
-
                   <View
                     style={
-                      styles.statusBadge
+                      styles.cardHeader
                     }
                   >
                     <Text
                       style={
-                        styles.statusText
+                        styles.category
                       }
                     >
-                      {formatStatus(
-                        report.status
+                      {formatCategory(
+                        report.category
                       )}
                     </Text>
+
+                    <View
+                      style={
+                        styles.statusBadge
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.statusText
+                        }
+                      >
+                        {formatStatus(
+                          report.status
+                        )}
+                      </Text>
+                    </View>
                   </View>
-                </View>
 
-                <Text
-                  style={
-                    styles.description
-                  }
-                >
-                  {report.description}
-                </Text>
+                  <Text
+                    style={
+                      styles.description
+                    }
+                  >
+                    {report.description}
+                  </Text>
 
-                <Text
-                  style={styles.info}
-                >
-                  Address:{' '}
-                  {report.address ||
-                    'Address unavailable'}
-                </Text>
-
-                <Text
-                  style={styles.info}
-                >
-                  Report ID:{' '}
-                  {report._id}
-                </Text>
-
-                {report.created_at ? (
                   <Text
                     style={styles.info}
                   >
-                    Reported:{' '}
-                    {new Date(
-                      report.created_at
-                    ).toLocaleString()}
+                    Address:{' '}
+                    {report.address ||
+                      'Address unavailable'}
                   </Text>
-                ) : null}
+
+                  <Text
+                    style={styles.info}
+                  >
+                    Report ID:{' '}
+                    {report._id}
+                  </Text>
+
+                  {report.created_at ? (
+                    <Text
+                      style={styles.info}
+                    >
+                      Reported:{' '}
+                      {formatDate(
+                        report.created_at
+                      )}
+                    </Text>
+                  ) : null}
+
+                  {/* ACTIVITY TIMELINE */}
+                  {activityHistory.length > 0 ? (
+                    <View
+                      style={
+                        styles.timelineSection
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.sectionTitle
+                        }
+                      >
+                        Activity Timeline
+                      </Text>
+
+                      <View
+                        style={
+                          styles.timelineList
+                        }
+                      >
+                        {activityHistory.map(
+                          (
+                            activity,
+                            index
+                          ) => {
+                            const isLast =
+                              index ===
+                              activityHistory.length -
+                                1;
+
+                            return (
+                              <View
+                                key={`${activity.type}-${activity.created_at || index}-${index}`}
+                                style={
+                                  styles.activityRow
+                                }
+                              >
+                                <View
+                                  style={
+                                    styles.activityMarkerColumn
+                                  }
+                                >
+                                  <View
+                                    style={[
+                                      styles.activityCircle,
+                                      getActivityCircleStyle(
+                                        activity.type
+                                      ),
+                                    ]}
+                                  >
+                                    <Text
+                                      style={
+                                        styles.activityCheck
+                                      }
+                                    >
+                                      ✓
+                                    </Text>
+                                  </View>
+
+                                  {!isLast ? (
+                                    <View
+                                      style={
+                                        styles.activityLine
+                                      }
+                                    />
+                                  ) : null}
+                                </View>
+
+                                <View
+                                  style={[
+                                    styles.activityContent,
+                                    !isLast &&
+                                      styles.activityContentWithSpacing,
+                                  ]}
+                                >
+                                  <Text
+                                    style={
+                                      styles.activityMessage
+                                    }
+                                  >
+                                    {activity.message ||
+                                      formatStatus(
+                                        activity.type
+                                      )}
+                                  </Text>
+
+                                  {activity.created_at ? (
+                                    <Text
+                                      style={
+                                        styles.activityDate
+                                      }
+                                    >
+                                      {formatDate(
+                                        activity.created_at
+                                      )}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                              </View>
+                            );
+                          }
+                        )}
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* RESOLUTION DETAILS */}
+                  {report.status ===
+                  'resolved' ? (
+                    <View
+                      style={
+                        styles.resolutionContainer
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.resolutionTitle
+                        }
+                      >
+                        Resolution Details
+                      </Text>
+
+                      {report.resolution_photo_url ? (
+                        <View
+                          style={
+                            styles.resolutionBlock
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.resolutionLabel
+                            }
+                          >
+                            Resolution Proof
+                          </Text>
+
+                          <Image
+                            source={{
+                              uri: `${API_URL}${report.resolution_photo_url}`,
+                            }}
+                            style={
+                              styles.resolutionImage
+                            }
+                            resizeMode="contain"
+                          />
+                        </View>
+                      ) : null}
+
+                      {report.resolution_remarks ? (
+                        <View
+                          style={
+                            styles.resolutionBlock
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.resolutionLabel
+                            }
+                          >
+                            Officer Remarks
+                          </Text>
+
+                          <Text
+                            style={
+                              styles.resolutionText
+                            }
+                          >
+                            {
+                              report.resolution_remarks
+                            }
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      {report.resolved_at ? (
+                        <Text
+                          style={
+                            styles.resolutionDate
+                          }
+                        >
+                          Resolved:{' '}
+                          {formatDate(
+                            report.resolved_at
+                          )}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </>
       )}
     </ScrollView>
@@ -581,6 +904,137 @@ const styles = StyleSheet.create({
     marginTop: 9,
     fontSize: 13,
     lineHeight: 19,
+    color: '#6b7280',
+  },
+
+  timelineSection: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+
+  timelineList: {
+    marginTop: 14,
+  },
+
+  activityRow: {
+    flexDirection: 'row',
+  },
+
+  activityMarkerColumn: {
+    width: 34,
+    alignItems: 'center',
+  },
+
+  activityCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  activityCircleReported: {
+    backgroundColor: '#374151',
+  },
+
+  activityCircleAssigned: {
+    backgroundColor: '#d97706',
+  },
+
+  activityCircleProgress: {
+    backgroundColor: '#2563eb',
+  },
+
+  activityCircleResolved: {
+    backgroundColor: '#16a34a',
+  },
+
+  activityCheck: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  activityLine: {
+    width: 2,
+    flex: 1,
+    minHeight: 38,
+    backgroundColor: '#d1d5db',
+  },
+
+  activityContent: {
+    flex: 1,
+    paddingLeft: 10,
+  },
+
+  activityContentWithSpacing: {
+    paddingBottom: 18,
+  },
+
+  activityMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    color: '#374151',
+  },
+
+  activityDate: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#9ca3af',
+  },
+
+  resolutionContainer: {
+    marginTop: 20,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    backgroundColor: '#f0fdf4',
+  },
+
+  resolutionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#166534',
+  },
+
+  resolutionBlock: {
+    marginTop: 14,
+  },
+
+  resolutionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#374151',
+  },
+
+  resolutionImage: {
+    width: '100%',
+    height: 220,
+    marginTop: 8,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+  },
+
+  resolutionText: {
+    marginTop: 6,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#374151',
+  },
+
+  resolutionDate: {
+    marginTop: 14,
+    fontSize: 13,
     color: '#6b7280',
   },
 });

@@ -90,11 +90,25 @@ export default function LoginScreen() {
       );
 
       // After login always open Home
-     if (from === 'report') {
-  router.replace('/report');
-} else {
-  router.replace('/');
+     // Role-based navigation after login
+if (data.user.role === 'admin') {
+  router.replace('/admin');
+  return;
 }
+
+if (data.user.role === 'officer') {
+  router.replace('/officer');
+  return;
+}
+
+// Citizen can return to Report Issue
+// when login was opened from report flow.
+if (from === 'report') {
+  router.replace('/report');
+  return;
+}
+
+router.replace('/');
     } catch (error) {
       console.log(
         'Login error:',
