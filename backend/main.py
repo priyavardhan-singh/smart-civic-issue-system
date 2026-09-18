@@ -3,6 +3,14 @@ from pathlib import Path
 from uuid import uuid4
 import shutil
 
+import os
+import json
+from urllib.parse import urlencode
+from urllib.request import urlopen, Request
+from urllib.error import URLError, HTTPError
+
+from dotenv import load_dotenv
+
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -42,6 +50,7 @@ from auth import (
 from jose import JWTError, jwt
 from bson import ObjectId
 
+load_dotenv()
 
 app = FastAPI()
 
@@ -207,6 +216,75 @@ def database_health():
         "status": "ok",
         "database": "connected",
     }
+
+
+@app.get("/reverse-geocode")
+def reverse_geocode(
+    latitude: float,
+    longitude: float,
+    current_user=Security(
+        get_current_user
+    ),
+):
+    url = (
+        "https://nominatim.openstreetmap.org/"
+        "reverse?"
+        f"format=json"
+        f"&lat={latitude}"
+        f"&lon={longitude}"
+        f"&zoom=18"
+        f"&addressdetails=1"
+    )
+
+    try:
+        request = Request(
+            url,
+            headers={
+                "User-Agent":
+                    "Smart-Civic-Issue-System/1.0"
+            },
+        )
+
+        with urlopen(
+            request,
+            timeout=10,
+        ) as response:
+            data = json.loads(
+                response.read()
+                .decode("utf-8")
+            )
+
+    except (
+        URLError,
+        HTTPError,
+        TimeoutError,
+    ) as error:
+        print(
+            "Reverse geocoding error:",
+            error,
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Unable to contact "
+                "reverse geocoding service"
+            ),
+        )
+
+    address = data.get(
+        "display_name"
+    )
+
+    if address:
+        return {
+            "address": address
+        }
+
+    raise HTTPException(
+        status_code=404,
+        detail="Address not found",
+    )
 
 
 # ---------------------------------------------------

@@ -43,6 +43,7 @@ const CATEGORIES = [
 const REPORT_DRAFT_KEY = 'report_draft';
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+
 export default function ReportIssue() {
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -225,43 +226,64 @@ export default function ReportIssue() {
   longitude: number
 ) => {
   try {
-    const addresses =
-      await Location.reverseGeocodeAsync({
-        latitude,
-        longitude,
-      });
+    setAddress('Fetching address...');
 
-    if (addresses.length > 0) {
-      const item = addresses[0];
-
-      const readableAddress = [
-        item.name,
-        item.street,
-        item.district,
-        item.city,
-        item.region,
-        item.postalCode,
-        item.country,
-      ]
-        .filter(Boolean)
-        .join(', ');
-
-      setAddress(
-        readableAddress || 'Address not found'
+    const token =
+      await SecureStore.getItemAsync(
+        'access_token'
       );
-    } else {
-      setAddress('Address not found');
+
+    if (!token) {
+      throw new Error(
+        'Login required for address lookup.'
+      );
     }
+
+    const response = await fetch(
+      `${API_URL}/reverse-geocode?latitude=${latitude}&longitude=${longitude}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    console.log(
+      'Reverse geocoding response:',
+      response.status,
+      data
+    );
+
+    if (
+      response.ok &&
+      data?.address
+    ) {
+      setAddress(data.address);
+      return;
+    }
+
+    const detail =
+      typeof data?.detail === 'string'
+        ? data.detail
+        : JSON.stringify(data?.detail);
+
+    throw new Error(
+      detail ||
+        'Unable to fetch address.'
+    );
   } catch (error) {
     console.log(
       'Reverse geocoding error:',
       error
     );
 
-    setAddress('Unable to find address');
+    setAddress(
+      `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+    );
   }
 };
-
   // ------------------------------------------------------------
   // UPDATE LOCATION
   // Used by GPS, search and marker drag
@@ -547,14 +569,25 @@ export default function ReportIssue() {
       }
     );
 
-    const data = await response.json();
+   const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(
-        data.detail ||
-          'Failed to submit report.'
-      );
-    }
+console.log(
+  'Report submission response:',
+  response.status,
+  data
+);
+
+if (!response.ok) {
+  const detail =
+    typeof data.detail === 'string'
+      ? data.detail
+      : JSON.stringify(data.detail);
+
+  throw new Error(
+    detail ||
+      'Failed to submit report.'
+  );
+}
 
     console.log(
       'Report submitted successfully:',
