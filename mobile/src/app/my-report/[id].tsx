@@ -18,7 +18,7 @@ import {
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
 
-const API_URL = 'http://192.168.29.11:8000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 type ActivityItem = {
   type: string;
