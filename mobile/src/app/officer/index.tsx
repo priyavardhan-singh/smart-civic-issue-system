@@ -132,10 +132,40 @@ export default function OfficerScreen() {
     return categories[category] || category;
   };
 
-  const formatDate = (date?: string) => {
-    if (!date) return '';
-    return new Date(date).toLocaleString();
-  };
+  const formatDate = (
+  value?: string
+) => {
+  if (!value) {
+    return '';
+  }
+
+  const hasTimezone =
+    /Z$|[+-]\d{2}:\d{2}$/.test(value);
+
+  const normalizedValue =
+    hasTimezone
+      ? value
+      : `${value}Z`;
+
+  const date = new Date(normalizedValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString(
+    'en-IN',
+    {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }
+  );
+};
 
   const shortText = (text: string, limit = 90) => {
     if (text.length <= limit) return text;
