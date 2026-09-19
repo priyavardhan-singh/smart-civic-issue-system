@@ -11,6 +11,9 @@ from urllib.error import URLError, HTTPError
 
 from dotenv import load_dotenv
 
+import cloudinary
+import cloudinary.uploader
+
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -51,6 +54,13 @@ from jose import JWTError, jwt
 from bson import ObjectId
 
 load_dotenv()
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True,
+)
 
 app = FastAPI()
 
@@ -499,6 +509,12 @@ def create_report(
 
         "photo_url":
             f"/uploads/{unique_filename}",
+
+                "photo_cloudinary_url":
+        cloudinary_photo_url,
+
+    "photo_cloudinary_public_id":
+        cloudinary_public_id,
     }
 
 
@@ -1200,6 +1216,53 @@ def resolve_officer_report(
         shutil.copyfileobj(
             resolution_photo.file,
             buffer,
+        )
+
+            # Reset file pointer after local save
+    # so Cloudinary can read the image too.
+    photo.file.seek(0)
+
+    try:
+        cloudinary_result = (
+            cloudinary.uploader.upload(
+                photo.file,
+                folder="smart-civic/reports",
+                resource_type="image",
+            )
+        )
+    except Exception as error:
+        print(
+            "Cloudinary upload error:",
+            error,
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Unable to upload report "
+                "photo to cloud storage"
+            ),
+        )
+
+    cloudinary_photo_url = (
+        cloudinary_result.get(
+            "secure_url"
+        )
+    )
+
+    cloudinary_public_id = (
+        cloudinary_result.get(
+            "public_id"
+        )
+    )
+
+    if not cloudinary_photo_url:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Cloud storage did not "
+                "return an image URL"
+            ),
         )
 
     now = datetime.now(
