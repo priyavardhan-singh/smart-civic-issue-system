@@ -1209,10 +1209,8 @@ def resolve_officer_report(
         )
 
     if (
-        not resolution_photo
-        .content_type
-        or not resolution_photo
-        .content_type
+        not resolution_photo.content_type
+        or not resolution_photo.content_type
         .startswith("image/")
     ):
         raise HTTPException(
@@ -1225,8 +1223,7 @@ def resolve_officer_report(
 
     file_extension = (
         Path(
-            resolution_photo
-            .filename
+            resolution_photo.filename
             or ""
         )
         .suffix
@@ -1262,6 +1259,7 @@ def resolve_officer_report(
         / unique_filename
     )
 
+    # Temporary local save for compatibility.
     with file_path.open(
         "wb"
     ) as buffer:
@@ -1270,50 +1268,50 @@ def resolve_officer_report(
             buffer,
         )
 
-            # Reset file pointer after local save
-    # so Cloudinary can read the image too.
-    photo.file.seek(0)
+    # Reset pointer so Cloudinary can
+    # read the same uploaded image.
+    resolution_photo.file.seek(0)
 
     try:
         cloudinary_result = (
             cloudinary.uploader.upload(
-                photo.file,
-                folder="smart-civic/reports",
+                resolution_photo.file,
+                folder="smart-civic/resolutions",
                 resource_type="image",
             )
         )
     except Exception as error:
         print(
-            "Cloudinary upload error:",
+            "Cloudinary resolution upload error:",
             error,
         )
 
         raise HTTPException(
             status_code=502,
             detail=(
-                "Unable to upload report "
-                "photo to cloud storage"
+                "Unable to upload resolution "
+                "proof to cloud storage"
             ),
         )
 
-    cloudinary_photo_url = (
+    resolution_cloudinary_url = (
         cloudinary_result.get(
             "secure_url"
         )
     )
 
-    cloudinary_public_id = (
+    resolution_cloudinary_public_id = (
         cloudinary_result.get(
             "public_id"
         )
     )
 
-    if not cloudinary_photo_url:
+    if not resolution_cloudinary_url:
         raise HTTPException(
             status_code=502,
             detail=(
                 "Cloud storage did not "
-                "return an image URL"
+                "return a resolution image URL"
             ),
         )
 
@@ -1327,47 +1325,53 @@ def resolve_officer_report(
     )
 
     db.reports.update_one(
-    {
-        "_id":
-            ObjectId(
-                report_id
-            ),
+        {
+            "_id":
+                ObjectId(
+                    report_id
+                ),
 
-        "assigned_officer_id":
-            officer_id,
-    },
-    {
-        "$set": {
-            "status":
-                "resolved",
-
-            "resolution_remarks":
-                clean_remarks,
-
-            "resolution_photo_url":
-                resolution_photo_url,
-
-            "resolved_at":
-                now,
-
-            "updated_at":
-                now,
+            "assigned_officer_id":
+                officer_id,
         },
-
-        "$push": {
-            "activity_history": {
-                "type":
+        {
+            "$set": {
+                "status":
                     "resolved",
 
-                "message":
-                    "Issue resolved with officer proof",
+                "resolution_remarks":
+                    clean_remarks,
 
-                "created_at":
+                "resolution_photo_url":
+                    resolution_photo_url,
+
+                "resolution_photo_cloudinary_url":
+                    resolution_cloudinary_url,
+
+                "resolution_photo_cloudinary_public_id":
+                    resolution_cloudinary_public_id,
+
+                "resolved_at":
                     now,
-            }
+
+                "updated_at":
+                    now,
+            },
+
+            "$push": {
+                "activity_history": {
+                    "type":
+                        "resolved",
+
+                    "message":
+                        "Issue resolved with officer proof",
+
+                    "created_at":
+                        now,
+                }
+            },
         },
-    },
-)   
+    )
 
     return {
         "message":
@@ -1381,8 +1385,10 @@ def resolve_officer_report(
 
         "resolution_photo_url":
             resolution_photo_url,
-    }
 
+        "resolution_photo_cloudinary_url":
+            resolution_cloudinary_url,
+    }
 
 # ---------------------------------------------------
 # ADMIN - CREATE DEPARTMENT
