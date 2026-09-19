@@ -2,3 +2,12 @@ backend/.env
 backend/venv/
 backend/__pycache__/
 backend/uploads/
+frontend/.env
+
+mobile/.claude/
+mobile/.vscode/
+mobile/AGENTS.md
+mobile/CLAUDE.md
+mobile/README.md
+mobile/scripts/
+mobile/LICENSE
