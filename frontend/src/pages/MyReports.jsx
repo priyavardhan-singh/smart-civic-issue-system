@@ -4,8 +4,7 @@ import {
   useNavigate,
 } from "react-router-dom"
 
-const API_URL =
-  "http://127.0.0.1:8000"
+const API_URL = import.meta.env.VITE_API_URL
 
 function MyReports() {
   const [reports, setReports] =
@@ -378,15 +377,19 @@ function MyReports() {
                     className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
                   >
 
-                    {report.photo_url && (
+                    {(report.photo_cloudinary_url || report.photo_url) && (
 
-                      <img
-                        src={`${API_URL}${report.photo_url}`}
-                        alt="Reported civic issue"
-                        className="h-56 w-full bg-gray-100 object-contain"
-                      />
+  <img
+    src={
+      report.photo_cloudinary_url
+        ? report.photo_cloudinary_url
+        : `${API_URL}${report.photo_url}`
+    }
+    alt="Reported civic issue"
+    className="h-56 w-full bg-gray-100 object-contain"
+  />
 
-                    )}
+)}
 
                     <div className="p-5">
 
@@ -549,7 +552,10 @@ function MyReports() {
                             Resolution Details
                           </h3>
 
-                          {report.resolution_photo_url && (
+                          {(
+  report.resolution_photo_cloudinary_url ||
+  report.resolution_photo_url
+) && (
 
                             <div className="mt-4">
 
@@ -558,7 +564,11 @@ function MyReports() {
                               </p>
 
                               <img
-                                src={`${API_URL}${report.resolution_photo_url}`}
+                                src={
+  report.resolution_photo_cloudinary_url
+    ? report.resolution_photo_cloudinary_url
+    : `${API_URL}${report.resolution_photo_url}`
+}
                                 alt="Resolution proof"
                                 className="mt-2 max-h-72 w-full rounded-lg border bg-white object-contain"
                               />

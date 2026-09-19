@@ -5,7 +5,7 @@ import {
   useParams,
 } from "react-router-dom"
 
-const API_URL = "http://127.0.0.1:8000"
+const API_URL = import.meta.env.VITE_API_URL
 
 function AdminReportDetails() {
   const { reportId } = useParams()
@@ -509,17 +509,21 @@ function AdminReportDetails() {
 
           {/* ORIGINAL ISSUE PHOTO */}
 
-          {report.photo_url && (
-            <div className="flex min-h-80 w-full items-center justify-center bg-gray-100 p-4">
+          {(report.photo_cloudinary_url || report.photo_url) && (
+  <div className="flex min-h-80 w-full items-center justify-center bg-gray-100 p-4">
 
-              <img
-                src={`${API_URL}${report.photo_url}`}
-                alt="Citizen reported issue"
-                className="max-h-[600px] w-full object-contain"
-              />
+    <img
+      src={
+        report.photo_cloudinary_url
+          ? report.photo_cloudinary_url
+          : `${API_URL}${report.photo_url}`
+      }
+      alt="Citizen reported issue"
+      className="max-h-[600px] w-full object-contain"
+    />
 
-            </div>
-          )}
+  </div>
+)}
 
           <div className="p-6">
 
@@ -673,7 +677,10 @@ function AdminReportDetails() {
                   issue.
                 </p>
 
-                {report.resolution_photo_url && (
+                {(
+  report.resolution_photo_cloudinary_url ||
+  report.resolution_photo_url
+) && (
                   <div className="mt-5">
 
                     <p className="text-sm font-semibold text-gray-700">
@@ -683,7 +690,11 @@ function AdminReportDetails() {
                     <div className="mt-2 flex items-center justify-center rounded-lg border bg-white p-3">
 
                       <img
-                        src={`${API_URL}${report.resolution_photo_url}`}
+                        src={
+  report.resolution_photo_cloudinary_url
+    ? report.resolution_photo_cloudinary_url
+    : `${API_URL}${report.resolution_photo_url}`
+}
                         alt="Officer resolution proof"
                         className="max-h-[500px] w-full object-contain"
                       />

@@ -4,8 +4,7 @@ import {
   useNavigate,
 } from "react-router-dom"
 
-const API_URL =
-  "http://127.0.0.1:8000"
+const API_URL = import.meta.env.VITE_API_URL
 
 function AdminDashboard() {
   const [reports, setReports] =
@@ -704,19 +703,23 @@ function AdminDashboard() {
                 className="overflow-hidden rounded-xl border bg-white shadow-sm"
               >
 
-                {report.photo_url && (
+                {(report.photo_cloudinary_url || report.photo_url) && (
 
-                  <div className="flex h-64 w-full items-center justify-center bg-gray-100">
+  <div className="flex h-64 w-full items-center justify-center bg-gray-100">
 
-                    <img
-                      src={`${API_URL}${report.photo_url}`}
-                      alt="Reported civic issue"
-                      className="h-full w-full object-contain"
-                    />
+    <img
+      src={
+        report.photo_cloudinary_url
+          ? report.photo_cloudinary_url
+          : `${API_URL}${report.photo_url}`
+      }
+      alt="Reported civic issue"
+      className="h-full w-full object-contain"
+    />
 
-                  </div>
+  </div>
 
-                )}
+)}
 
                 <div className="p-6">
 

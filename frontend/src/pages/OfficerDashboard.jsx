@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-const API_URL = "http://127.0.0.1:8000"
+const API_URL = import.meta.env.VITE_API_URL
 
 function OfficerDashboard() {
   const [reports, setReports] = useState([])
@@ -405,15 +405,19 @@ function OfficerDashboard() {
                     className="overflow-hidden rounded-xl border bg-white shadow-sm"
                   >
 
-                    {report.photo_url && (
-                      <div className="bg-gray-100">
-                        <img
-                          src={`${API_URL}${report.photo_url}`}
-                          alt="Reported civic issue"
-                          className="h-64 w-full object-contain"
-                        />
-                      </div>
-                    )}
+                   {(report.photo_cloudinary_url || report.photo_url) && (
+  <div className="bg-gray-100">
+    <img
+      src={
+        report.photo_cloudinary_url
+          ? report.photo_cloudinary_url
+          : `${API_URL}${report.photo_url}`
+      }
+      alt="Reported civic issue"
+      className="h-64 w-full object-contain"
+    />
+  </div>
+)}
 
                     <div className="p-6">
 
@@ -626,14 +630,21 @@ function OfficerDashboard() {
                             Issue Resolved
                           </div>
 
-                          {report.resolution_photo_url && (
+                          {(
+  report.resolution_photo_cloudinary_url ||
+  report.resolution_photo_url
+) && (
                             <div className="mt-4">
                               <p className="text-sm font-semibold text-gray-700">
                                 Resolution Proof
                               </p>
 
                               <img
-                                src={`${API_URL}${report.resolution_photo_url}`}
+                                src={
+  report.resolution_photo_cloudinary_url
+    ? report.resolution_photo_cloudinary_url
+    : `${API_URL}${report.resolution_photo_url}`
+}
                                 alt="Resolution proof"
                                 className="mt-2 max-h-72 w-full rounded-lg border bg-gray-50 object-contain"
                               />

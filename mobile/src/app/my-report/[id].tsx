@@ -35,6 +35,7 @@ type Report = {
   longitude: number;
   address: string;
   photo_url?: string;
+  photo_cloudinary_url?: string;
   status: string;
   created_at?: string;
   assigned_at?: string;
@@ -44,6 +45,7 @@ type Report = {
   resolved_at?: string;
   resolution_remarks?: string;
   resolution_photo_url?: string;
+  resolution_photo_cloudinary_url?: string;
   activity_history?: ActivityItem[];
 };
 
@@ -424,14 +426,17 @@ export default function MyReportDetailsScreen() {
           <View
             style={styles.card}
           >
-            {report.photo_url ? (
+            {(
+              report.photo_cloudinary_url ||
+              report.photo_url
+            ) ? (
               <Image
                 source={{
-                  uri: `${API_URL}${report.photo_url}`,
+                  uri:
+                    report.photo_cloudinary_url ||
+                    `${API_URL}${report.photo_url}`,
                 }}
-                style={
-                  styles.image
-                }
+                style={styles.image}
                 resizeMode="contain"
               />
             ) : null}
@@ -621,27 +626,26 @@ export default function MyReportDetailsScreen() {
                   Resolution Details
                 </Text>
 
-                {report.resolution_photo_url ? (
+                {(
+                  report.resolution_photo_cloudinary_url ||
+                  report.resolution_photo_url
+                ) ? (
                   <View
-                    style={
-                      styles.resolutionBlock
-                    }
+                    style={styles.resolutionBlock}
                   >
                     <Text
-                      style={
-                        styles.resolutionLabel
-                      }
+                      style={styles.resolutionLabel}
                     >
                       Resolution Proof
                     </Text>
 
                     <Image
                       source={{
-                        uri: `${API_URL}${report.resolution_photo_url}`,
+                        uri:
+                          report.resolution_photo_cloudinary_url ||
+                          `${API_URL}${report.resolution_photo_url}`,
                       }}
-                      style={
-                        styles.resolutionImage
-                      }
+                      style={styles.resolutionImage}
                       resizeMode="contain"
                     />
                   </View>

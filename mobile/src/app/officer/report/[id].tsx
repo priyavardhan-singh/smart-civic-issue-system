@@ -23,6 +23,7 @@ type Report = {
   description: string;
   address?: string;
   photo_url?: string;
+  photo_cloudinary_url?: string;
   status: string;
   created_at?: string;
   assigned_at?: string;
@@ -30,6 +31,7 @@ type Report = {
   resolved_at?: string;
   resolution_remarks?: string;
   resolution_photo_url?: string;
+  resolution_photo_cloudinary_url?: string;
 };
 
 export default function OfficerReportDetailsScreen() {
@@ -348,9 +350,16 @@ export default function OfficerReportDetailsScreen() {
           </View>
 
           <View style={styles.card}>
-            {report.photo_url ? (
+            {(
+              report.photo_cloudinary_url ||
+              report.photo_url
+            ) ? (
               <Image
-                source={{ uri: `${API_URL}${report.photo_url}` }}
+                source={{
+                  uri:
+                    report.photo_cloudinary_url ||
+                    `${API_URL}${report.photo_url}`,
+                }}
                 style={styles.issueImage}
                 resizeMode="contain"
               />
@@ -445,9 +454,16 @@ export default function OfficerReportDetailsScreen() {
               <View style={styles.resolvedContainer}>
                 <Text style={styles.resolvedTitle}>Issue Resolved</Text>
 
-                {report.resolution_photo_url ? (
+                {(
+                  report.resolution_photo_cloudinary_url ||
+                  report.resolution_photo_url
+                ) ? (
                   <Image
-                    source={{ uri: `${API_URL}${report.resolution_photo_url}` }}
+                    source={{
+                      uri:
+                        report.resolution_photo_cloudinary_url ||
+                        `${API_URL}${report.resolution_photo_url}`,
+                    }}
                     style={styles.resolutionImage}
                     resizeMode="contain"
                   />
