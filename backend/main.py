@@ -431,6 +431,7 @@ def create_report(
         / unique_filename
     )
 
+    # Save locally for temporary compatibility.
     with file_path.open(
         "wb"
     ) as buffer:
@@ -439,55 +440,109 @@ def create_report(
             buffer,
         )
 
+    # Reset file pointer so Cloudinary
+    # can read the image again.
+    photo.file.seek(0)
+
+    try:
+        cloudinary_result = (
+            cloudinary.uploader.upload(
+                photo.file,
+                folder="smart-civic/reports",
+                resource_type="image",
+            )
+        )
+    except Exception as error:
+        print(
+            "Cloudinary upload error:",
+            error,
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Unable to upload report "
+                "photo to cloud storage"
+            ),
+        )
+
+    cloudinary_photo_url = (
+        cloudinary_result.get(
+            "secure_url"
+        )
+    )
+
+    cloudinary_public_id = (
+        cloudinary_result.get(
+            "public_id"
+        )
+    )
+
+    if not cloudinary_photo_url:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Cloud storage did not "
+                "return an image URL"
+            ),
+        )
+
     now = datetime.now(
         timezone.utc
     )
 
     report_data = {
-    "user_id": str(
-        current_user["_id"]
-    ),
+        "user_id":
+            str(
+                current_user["_id"]
+            ),
 
-    "category":
-        category,
+        "category":
+            category,
 
-    "description":
-        description,
+        "description":
+            description,
 
-    "latitude":
-        latitude,
+        "latitude":
+            latitude,
 
-    "longitude":
-        longitude,
+        "longitude":
+            longitude,
 
-    "address":
-        address,
+        "address":
+            address,
 
-    "photo_url":
-        f"/uploads/{unique_filename}",
+        "photo_url":
+            f"/uploads/{unique_filename}",
 
-    "status":
-        "reported",
+        "photo_cloudinary_url":
+            cloudinary_photo_url,
 
-    "activity_history": [
-        {
-            "type":
-                "reported",
+        "photo_cloudinary_public_id":
+            cloudinary_public_id,
 
-            "message":
-                "Report submitted successfully",
+        "status":
+            "reported",
 
-            "created_at":
-                now,
-        }
-    ],
+        "activity_history": [
+            {
+                "type":
+                    "reported",
 
-    "created_at":
-        now,
+                "message":
+                    "Report submitted successfully",
 
-    "updated_at":
-        now,
-}
+                "created_at":
+                    now,
+            }
+        ],
+
+        "created_at":
+            now,
+
+        "updated_at":
+            now,
+    }
 
     result = (
         db.reports.insert_one(
@@ -510,11 +565,8 @@ def create_report(
         "photo_url":
             f"/uploads/{unique_filename}",
 
-                "photo_cloudinary_url":
-        cloudinary_photo_url,
-
-    "photo_cloudinary_public_id":
-        cloudinary_public_id,
+        "photo_cloudinary_url":
+            cloudinary_photo_url,
     }
 
 
